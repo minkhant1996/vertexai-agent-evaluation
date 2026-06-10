@@ -1,0 +1,244 @@
+{
+  "eval_set_id": "founder_validation_agent_eval",
+  "name": "Founder Validation Agent Test Suite",
+  "description": "Evaluates the agent's ability to help founders clarify ideas, identify assumptions, generate interview questions, scope MVPs, and create validation plans.",
+  "eval_cases": [
+    {
+      "eval_id": "clarify_vague_idea",
+      "name": "Clarify a vague B2B idea",
+      "conversation": [
+        {
+          "invocation_id": "turn_1",
+          "user_content": {
+            "role": "user",
+            "parts": [{"text": "I want to build a tool that helps businesses manage their data better"}]
+          },
+          "expected_tool_use": [
+            {"name": "clarify_idea"}
+          ],
+          "expected_response_contains": [
+            "target customer",
+            "specific",
+            "problem"
+          ]
+        }
+      ]
+    },
+    {
+      "eval_id": "clarify_with_clear_problem",
+      "name": "Clarify idea with clear problem statement",
+      "conversation": [
+        {
+          "invocation_id": "turn_1",
+          "user_content": {
+            "role": "user",
+            "parts": [{"text": "I noticed that freelance designers waste hours every week chasing invoices. Most of my designer friends say this is their biggest frustration. I want to build something to help them."}]
+          },
+          "expected_tool_use": [
+            {"name": "clarify_idea"}
+          ],
+          "expected_response_contains": [
+            "freelance designers",
+            "invoice",
+            "pain"
+          ]
+        }
+      ]
+    },
+    {
+      "eval_id": "challenge_feature_first",
+      "name": "Challenge feature-first thinking",
+      "conversation": [
+        {
+          "invocation_id": "turn_1",
+          "user_content": {
+            "role": "user",
+            "parts": [{"text": "I want to build an app with AI that analyzes documents and has a dashboard with charts and integrates with Slack and has team collaboration features"}]
+          },
+          "expected_response_contains": [
+            "problem",
+            "customer",
+            "who"
+          ],
+          "expected_response_not_contains": [
+            "great idea",
+            "sounds good"
+          ]
+        }
+      ]
+    },
+    {
+      "eval_id": "identify_assumptions",
+      "name": "Identify risky assumptions",
+      "conversation": [
+        {
+          "invocation_id": "turn_1",
+          "user_content": {
+            "role": "user",
+            "parts": [{"text": "My clarified idea: A mobile app for pet owners to track their pet's health metrics. Target customer: dog owners aged 25-40. Core problem: Pet owners forget vet appointments and medication schedules."}]
+          },
+          "expected_tool_use": [
+            {"name": "identify_risky_assumptions"}
+          ],
+          "expected_response_contains": [
+            "assumption",
+            "risk",
+            "validate"
+          ]
+        }
+      ]
+    },
+    {
+      "eval_id": "generate_interview_questions",
+      "name": "Generate Mom Test compliant interview questions",
+      "conversation": [
+        {
+          "invocation_id": "turn_1",
+          "user_content": {
+            "role": "user",
+            "parts": [{"text": "I need to interview solo freelance accountants about their client acquisition challenges. My riskiest assumption is that they struggle to find new clients. What questions should I ask?"}]
+          },
+          "expected_tool_use": [
+            {"name": "generate_interview_questions"}
+          ],
+          "expected_response_contains": [
+            "last time",
+            "currently",
+            "tried"
+          ],
+          "expected_response_not_contains": [
+            "would you buy",
+            "would you use"
+          ]
+        }
+      ]
+    },
+    {
+      "eval_id": "analyze_weak_interview",
+      "name": "Analyze weak interview results honestly",
+      "conversation": [
+        {
+          "invocation_id": "turn_1",
+          "user_content": {
+            "role": "user",
+            "parts": [{"text": "I did 5 interviews with restaurant owners about scheduling. 4 out of 5 said scheduling is annoying but not their top problem - they care more about food costs. Only 1 said they would pay for a scheduling tool. Most use paper or free apps."}]
+          },
+          "expected_response_contains": [
+            "food costs",
+            "pivot",
+            "weak"
+          ],
+          "expected_response_not_contains": [
+            "great validation",
+            "proceed with"
+          ]
+        }
+      ]
+    },
+    {
+      "eval_id": "scope_overbuilt_mvp",
+      "name": "Cut down over-scoped MVP",
+      "conversation": [
+        {
+          "invocation_id": "turn_1",
+          "user_content": {
+            "role": "user",
+            "parts": [{"text": "For my invoicing tool for designers, I want to build: invoice creation, payment processing, client portal, expense tracking, tax reporting, and AI suggestions. Can you help me scope the MVP?"}]
+          },
+          "expected_tool_use": [
+            {"name": "define_mvp_scope"}
+          ],
+          "expected_response_contains": [
+            "one",
+            "cut",
+            "scope"
+          ]
+        }
+      ]
+    },
+    {
+      "eval_id": "create_interview_plan",
+      "name": "Create 7-day interview plan",
+      "conversation": [
+        {
+          "invocation_id": "turn_1",
+          "user_content": {
+            "role": "user",
+            "parts": [{"text": "I have a hypothesis about HR managers needing better onboarding tools. I haven't talked to any customers yet. Can you help me create a 7-day plan to validate this?"}]
+          },
+          "expected_tool_use": [
+            {"name": "create_7day_validation_plan"}
+          ],
+          "expected_response_contains": [
+            "interview",
+            "day",
+            "deliverable"
+          ],
+          "expected_response_not_contains": [
+            "build",
+            "code",
+            "develop"
+          ]
+        }
+      ]
+    },
+    {
+      "eval_id": "challenge_validation_seeker",
+      "name": "Challenge founder seeking validation only",
+      "conversation": [
+        {
+          "invocation_id": "turn_1",
+          "user_content": {
+            "role": "user",
+            "parts": [{"text": "I've already decided to build a social network for left-handed people. I just need you to help me with the MVP. Don't try to change my mind."}]
+          },
+          "expected_response_contains": [
+            "validate",
+            "evidence",
+            "customer"
+          ],
+          "expected_response_not_contains": [
+            "sounds great",
+            "let's build"
+          ]
+        }
+      ]
+    },
+    {
+      "eval_id": "multi_turn_full_flow",
+      "name": "Multi-turn validation flow",
+      "conversation": [
+        {
+          "invocation_id": "turn_1",
+          "user_content": {
+            "role": "user",
+            "parts": [{"text": "I want to help small business owners with their bookkeeping"}]
+          },
+          "expected_tool_use": [
+            {"name": "clarify_idea"}
+          ]
+        },
+        {
+          "invocation_id": "turn_2",
+          "user_content": {
+            "role": "user",
+            "parts": [{"text": "Target: Solo Etsy sellers doing $10-50k revenue. Problem: They spend 5+ hours per month on bookkeeping and often make mistakes."}]
+          },
+          "expected_tool_use": [
+            {"name": "identify_risky_assumptions"}
+          ]
+        },
+        {
+          "invocation_id": "turn_3",
+          "user_content": {
+            "role": "user",
+            "parts": [{"text": "The riskiest assumption is that they would pay for this. What interview questions should I ask?"}]
+          },
+          "expected_tool_use": [
+            {"name": "generate_interview_questions"}
+          ]
+        }
+      ]
+    }
+  ]
+}

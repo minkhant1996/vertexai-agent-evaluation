@@ -1,0 +1,36 @@
+{
+  "name": "founder_validation_eval",
+  "description": "Evaluation set for Founder Validation Agent",
+  "evalCases": [
+    {
+      "name": "clarify_vague_idea",
+      "userMessage": "I want to build something with AI that helps businesses",
+      "expectedToolCalls": ["delegate_to_agent"],
+      "expectedResponseContains": ["problem", "customer", "specific"]
+    },
+    {
+      "name": "challenge_feature_first",
+      "userMessage": "I want to build an app with AI that analyzes documents and has a dashboard with charts",
+      "expectedToolCalls": ["delegate_to_agent"],
+      "expectedResponseContains": ["problem", "who"]
+    },
+    {
+      "name": "identify_assumptions",
+      "userMessage": "My idea: A mobile app for pet owners to track health. Target: dog owners 25-40. Problem: forget vet appointments.",
+      "expectedToolCalls": ["delegate_to_agent"],
+      "expectedResponseContains": ["assumption", "risk"]
+    },
+    {
+      "name": "interview_questions",
+      "userMessage": "I need to interview freelance accountants about their client onboarding pain points",
+      "expectedToolCalls": ["delegate_to_agent"],
+      "expectedResponseContains": ["question", "interview"]
+    },
+    {
+      "name": "scope_mvp",
+      "userMessage": "For my invoicing tool, I want: invoice creation, payment tracking, recurring invoices, client portal, analytics dashboard, mobile app",
+      "expectedToolCalls": ["delegate_to_agent"],
+      "expectedResponseContains": ["simple", "minimal", "first"]
+    }
+  ]
+}

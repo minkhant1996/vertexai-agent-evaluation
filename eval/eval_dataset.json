@@ -1,0 +1,121 @@
+{
+  "eval_set_id": "founder_validation_agent_eval",
+  "name": "Founder Validation Agent - Official Vertex AI Eval",
+  "description": "Evaluates agent trajectory and response quality following Vertex AI guidelines",
+  "eval_cases": [
+    {
+      "eval_id": "clarify_vague_idea",
+      "name": "Clarify a vague B2B idea",
+      "prompt": "I want to build a tool that helps businesses manage their data better",
+      "reference_trajectory": [
+        {
+          "tool_name": "clarify_idea",
+          "tool_input": {}
+        }
+      ],
+      "expected_response_contains": ["problem", "customer", "specific", "who"]
+    },
+    {
+      "eval_id": "clarify_clear_problem",
+      "name": "Clarify idea with clear problem statement",
+      "prompt": "I noticed that freelance designers waste hours every week chasing invoices. Most of my designer friends say this is their biggest frustration. I want to build something to help them.",
+      "reference_trajectory": [
+        {
+          "tool_name": "clarify_idea",
+          "tool_input": {}
+        }
+      ],
+      "expected_response_contains": ["freelance", "designer", "invoice"]
+    },
+    {
+      "eval_id": "challenge_feature_first",
+      "name": "Challenge feature-first thinking",
+      "prompt": "I want to build an app with AI that analyzes documents and has a dashboard with charts and integrates with Slack and has team collaboration features",
+      "reference_trajectory": [],
+      "expected_response_contains": ["problem", "customer", "who"],
+      "expected_response_not_contains": ["great idea", "sounds good"]
+    },
+    {
+      "eval_id": "identify_assumptions",
+      "name": "Identify risky assumptions",
+      "prompt": "My clarified idea: A mobile app for pet owners to track their pet's health metrics. Target customer: dog owners aged 25-40. Core problem: Pet owners forget vet appointments and medication schedules.",
+      "reference_trajectory": [
+        {
+          "tool_name": "identify_risky_assumptions",
+          "tool_input": {}
+        }
+      ],
+      "expected_response_contains": ["assumption", "risk", "validate"]
+    },
+    {
+      "eval_id": "generate_interview_questions",
+      "name": "Generate Truth Questions compliant interview questions",
+      "prompt": "I need to interview solo freelance accountants about their client acquisition challenges. My riskiest assumption is that they struggle to find new clients. What questions should I ask?",
+      "reference_trajectory": [
+        {
+          "tool_name": "generate_interview_questions",
+          "tool_input": {}
+        }
+      ],
+      "expected_response_contains": ["last time", "currently", "tried"],
+      "expected_response_not_contains": ["would you buy", "would you use"]
+    },
+    {
+      "eval_id": "analyze_weak_interview",
+      "name": "Analyze weak interview results honestly",
+      "prompt": "I did 5 interviews with restaurant owners about scheduling. 4 out of 5 said scheduling is annoying but not their top problem - they care more about food costs. Only 1 said they would pay for a scheduling tool. Most use paper or free apps.",
+      "reference_trajectory": [],
+      "expected_response_contains": ["food cost", "pivot", "weak"],
+      "expected_response_not_contains": ["great validation", "proceed"]
+    },
+    {
+      "eval_id": "scope_mvp",
+      "name": "Cut down over-scoped MVP",
+      "prompt": "For my invoicing tool for designers, I want to build: invoice creation, payment processing, client portal, expense tracking, tax reporting, and AI suggestions. Can you help me scope the MVP?",
+      "reference_trajectory": [
+        {
+          "tool_name": "define_mvp_scope",
+          "tool_input": {}
+        }
+      ],
+      "expected_response_contains": ["one", "cut", "minimum", "focus"]
+    },
+    {
+      "eval_id": "create_validation_plan",
+      "name": "Create 7-day validation plan",
+      "prompt": "I have a hypothesis about HR managers needing better onboarding tools. I haven't talked to any customers yet. Can you help me create a 7-day plan to validate this?",
+      "reference_trajectory": [
+        {
+          "tool_name": "create_7day_validation_plan",
+          "tool_input": {}
+        }
+      ],
+      "expected_response_contains": ["interview", "day", "week"],
+      "expected_response_not_contains": ["build", "code", "develop"]
+    },
+    {
+      "eval_id": "challenge_validation_seeker",
+      "name": "Challenge founder seeking validation only",
+      "prompt": "I've already decided to build a social network for left-handed people. I just need you to help me with the MVP. Don't try to change my mind.",
+      "reference_trajectory": [],
+      "expected_response_contains": ["validate", "evidence", "customer", "assumption"],
+      "expected_response_not_contains": ["sounds great", "let's build"]
+    },
+    {
+      "eval_id": "full_flow_clarify_to_assumptions",
+      "name": "Multi-turn: Clarify then identify assumptions",
+      "prompt": "I want to help small business owners with their bookkeeping. Target: Solo Etsy sellers doing $10-50k revenue. Problem: They spend 5+ hours per month on bookkeeping and often make mistakes.",
+      "reference_trajectory": [
+        {
+          "tool_name": "clarify_idea",
+          "tool_input": {}
+        },
+        {
+          "tool_name": "identify_risky_assumptions",
+          "tool_input": {}
+        }
+      ],
+      "expected_response_contains": ["Etsy", "bookkeeping", "assumption"]
+    }
+  ]
+}

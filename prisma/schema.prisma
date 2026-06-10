@@ -1,0 +1,461 @@
+// Prisma schema for Founder Validation Agent
+// PostgreSQL database for storing validation data
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  background String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ventures    Venture[]
+  aiSessions  AISession[]
+}
+
+// ============================================
+// VENTURE (STARTUP PROJECT)
+// ============================================
+
+model Venture {
+  id               String       @id @default(cuid())
+  userId           String
+  name             String
+  ideaDescription  String       @db.Text
+  targetCustomer   String?
+  problemStatement String?      @db.Text
+  currentStage     VentureStage @default(IDEA)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assumptions       Assumption[]
+  interviewQuestions InterviewQuestion[]
+  interviews        Interview[]
+  mvpScope          MVPScope?
+  validationPlans   ValidationPlan[]
+  evidence          Evidence[]
+  aiSessions        AISession[]
+
+  @@index([userId])
+}
+
+enum VentureStage {
+  IDEA
+  VALIDATION
+  MVP
+  LAUNCHED
+}
+
+// ============================================
+// ASSUMPTIONS
+// ============================================
+
+model Assumption {
+  id          String             @id @default(cuid())
+  ventureId   String
+  statement   String             @db.Text
+  category    AssumptionCategory
+  riskLevel   RiskLevel
+  howToTest   String?            @db.Text
+  validated   Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  venture  Venture    @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  evidence Evidence[]
+
+  @@index([ventureId])
+}
+
+enum AssumptionCategory {
+  CUSTOMER
+  PROBLEM
+  SOLUTION
+  BUSINESS_MODEL
+}
+
+enum RiskLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+// ============================================
+// INTERVIEW QUESTIONS
+// ============================================
+
+model InterviewQuestion {
+  id             String           @id @default(cuid())
+  ventureId      String
+  question       String           @db.Text
+  category       QuestionCategory
+  priority       Int              @default(3)
+  whatItValidates String?         @db.Text
+  followUpPrompts String[]
+  createdAt      DateTime         @default(now())
+
+  venture Venture @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+
+  @@index([ventureId])
+}
+
+enum QuestionCategory {
+  PROBLEM_DISCOVERY
+  SOLUTION_FIT
+  WILLINGNESS_TO_PAY
+  ALTERNATIVES
+}
+
+// ============================================
+// INTERVIEWS & EVIDENCE
+// ============================================
+
+model Interview {
+  id                    String              @id @default(cuid())
+  ventureId             String
+  intervieweeDescription String
+  conductedAt           DateTime            @default(now())
+  keyInsights           String[]
+  problemConfirmed      Boolean?
+  willingnessToPay      WillingnessLevel?
+  urgencyLevel          UrgencyLevel?
+  createdAt             DateTime            @default(now())
+
+  venture Venture         @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  quotes  InterviewQuote[]
+
+  @@index([ventureId])
+}
+
+model InterviewQuote {
+  id                String  @id @default(cuid())
+  interviewId       String
+  quote             String  @db.Text
+  context           String? @db.Text
+  relatedAssumption String?
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@index([interviewId])
+}
+
+enum WillingnessLevel {
+  STRONG
+  MODERATE
+  WEAK
+  NONE
+}
+
+enum UrgencyLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model Evidence {
+  id           String       @id @default(cuid())
+  ventureId    String
+  assumptionId String?
+  type         EvidenceType
+  description  String       @db.Text
+  supports     Boolean
+  confidence   ConfidenceLevel
+  source       String
+  collectedAt  DateTime     @default(now())
+
+  venture    Venture     @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  assumption Assumption? @relation(fields: [assumptionId], references: [id])
+
+  @@index([ventureId])
+  @@index([assumptionId])
+}
+
+enum EvidenceType {
+  INTERVIEW
+  SURVEY
+  OBSERVATION
+  DATA
+  EXPERIMENT
+}
+
+enum ConfidenceLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+// ============================================
+// MVP SCOPE
+// ============================================
+
+model MVPScope {
+  id            String   @id @default(cuid())
+  ventureId     String   @unique
+  coreFeature   String   @db.Text
+  whyThisFeature String?  @db.Text
+  outOfScope    String[]
+  successMetric String
+  mvpType       MVPType
+  buildEstimate String?
+  timeboxDays   Int      @default(7)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  venture Venture @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+}
+
+enum MVPType {
+  LANDING_PAGE
+  SMOKE_TEST
+  CONCIERGE
+  WIZARD_OF_OZ
+  PROTOTYPE
+}
+
+// ============================================
+// VALIDATION PLANS
+// ============================================
+
+model ValidationPlan {
+  id              String     @id @default(cuid())
+  ventureId       String
+  weekNumber      Int        @default(1)
+  primaryGoal     String     @db.Text
+  successCriteria String     @db.Text
+  status          PlanStatus @default(ACTIVE)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  venture Venture        @relation(fields: [ventureId], references: [id], onDelete: Cascade)
+  tasks   DailyTask[]
+  blockers Blocker[]
+
+  @@index([ventureId])
+}
+
+model DailyTask {
+  id           String   @id @default(cuid())
+  planId       String
+  day          Int
+  dayName      String
+  task         String   @db.Text
+  timeEstimate String?
+  deliverable  String   @db.Text
+  tips         String?  @db.Text
+  completed    Boolean  @default(false)
+  completedAt  DateTime?
+
+  plan ValidationPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+}
+
+model Blocker {
+  id                 String   @id @default(cuid())
+  planId             String
+  description        String   @db.Text
+  attemptedSolutions String[]
+  helpNeeded         String?  @db.Text
+  resolved           Boolean  @default(false)
+  resolvedAt         DateTime?
+  loggedAt           DateTime @default(now())
+
+  plan ValidationPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+}
+
+enum PlanStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+  ABANDONED
+}
+
+// ============================================
+// AI SESSIONS (Conversation History)
+// ============================================
+
+model AISession {
+  id          String   @id @default(cuid())
+  userId      String
+  ventureId   String?
+  sessionType SessionType
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  summary     String?  @db.Text
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venture  Venture?  @relation(fields: [ventureId], references: [id])
+  messages AIMessage[]
+
+  @@index([userId])
+  @@index([ventureId])
+}
+
+model AIMessage {
+  id        String      @id @default(cuid())
+  sessionId String
+  role      MessageRole
+  content   String      @db.Text
+  toolCalls Json?
+  timestamp DateTime    @default(now())
+
+  session AISession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+enum SessionType {
+  CLARIFY_IDEA
+  IDENTIFY_ASSUMPTIONS
+  PREPARE_INTERVIEWS
+  SCOPE_MVP
+  CREATE_PLAN
+  GENERAL
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  TOOL
+}
+
+// ============================================
+// TRACK 2: AGENT SIMULATION
+// ============================================
+
+model SimulationRun {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  edgeCaseId      String
+  edgeCaseType    String
+  founderPersona  Json
+  status          SimulationStatus @default(PENDING)
+  completedAt     DateTime?
+
+  turns           SimulationTurn[]
+  result          SimulationResult?
+
+  @@index([edgeCaseType])
+  @@index([status])
+}
+
+model SimulationTurn {
+  id              String   @id @default(cuid())
+  runId           String
+  turnNumber      Int
+  userMessage     String   @db.Text
+  agentResponse   String   @db.Text
+  toolsCalled     Json     // string[]
+  latencyMs       Int
+  traceId         String?
+  createdAt       DateTime @default(now())
+
+  run             SimulationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+}
+
+model SimulationResult {
+  id              String   @id @default(cuid())
+  runId           String   @unique
+  passed          Boolean
+  score           Float
+  failureReasons  Json?    // string[]
+  metrics         Json
+  createdAt       DateTime @default(now())
+
+  run             SimulationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+enum SimulationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
+// TRACK 2: AGENT OBSERVABILITY
+// ============================================
+
+model AgentTrace {
+  id              String   @id @default(cuid())
+  traceId         String   @unique
+  sessionId       String
+  userMessage     String   @db.Text
+  detectedIntent  String
+  expectedTool    String
+  actualToolsCalled Json   // string[]
+  response        String   @db.Text
+  latencyMs       Int
+  success         Boolean  @default(true)
+  failureReason   String?
+  createdAt       DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([traceId])
+  @@index([detectedIntent])
+}
+
+// ============================================
+// TRACK 2: AGENT OPTIMIZER
+// ============================================
+
+model InstructionVersion {
+  id                       String   @id @default(cuid())
+  version                  Int      @unique @default(autoincrement())
+  instruction              String   @db.Text
+  previousInstruction      String?  @db.Text
+  failurePatternsAddressed Json     // string[]
+  changes                  Json?    // description of changes
+  passRateBefore           Float?
+  passRateAfter            Float?
+  isActive                 Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  createdBy                String?
+
+  abTestsAsA               ABTest[] @relation("InstructionA")
+  abTestsAsB               ABTest[] @relation("InstructionB")
+}
+
+model ABTest {
+  id              String   @id @default(cuid())
+  instructionAId  String
+  instructionBId  String
+  testCases       Json     // string[]
+  resultsA        Json     // TestResult[]
+  resultsB        Json     // TestResult[]
+  winner          String?  // 'A' or 'B' or null if tie
+  passRateA       Float?
+  passRateB       Float?
+  status          ABTestStatus @default(PENDING)
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  instructionA    InstructionVersion @relation("InstructionA", fields: [instructionAId], references: [id])
+  instructionB    InstructionVersion @relation("InstructionB", fields: [instructionBId], references: [id])
+
+  @@index([status])
+}
+
+enum ABTestStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+}
