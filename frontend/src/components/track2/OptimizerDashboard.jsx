@@ -105,6 +105,35 @@ export function OptimizerDashboard() {
     await runOptimization([pattern.pattern])
   }
 
+  // Fix ALL patterns across ALL relevant agents
+  const runOptimizationAllAgents = async () => {
+    setOptimizing(true)
+    try {
+      const body = {
+        useADK: useADK && !useQualityFlywheel,
+      }
+
+      const res = await fetch(`${BACKEND_URL}/api/optimizer/optimize-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+
+      if (data.summary) {
+        const agentCount = data.summary.agentsOptimized
+        const patternCount = data.summary.totalPatterns
+        console.log(`[Optimizer] Fixed ${patternCount} patterns across ${agentCount} agents`)
+      }
+
+      await fetchVersions()
+      await fetchPatterns()
+    } catch (err) {
+      console.error('Failed to optimize all agents:', err)
+    }
+    setOptimizing(false)
+  }
+
   const applyVersion = async (versionId) => {
     try {
       const res = await fetch(`${BACKEND_URL}/api/optimizer/apply`, {
@@ -243,7 +272,7 @@ export function OptimizerDashboard() {
             {abTestRunning ? 'Running...' : 'A/B Test'}
           </Button>
           <Button
-            onClick={() => runOptimization()}
+            onClick={() => runOptimizationAllAgents()}
             disabled={optimizing || patterns.length === 0}
           >
             <Zap className="w-4 h-4" />
@@ -412,26 +441,34 @@ export function OptimizerDashboard() {
               <div className="text-center py-8 text-slate-500">No failures detected. Run simulations first.</div>
             ) : (
               <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                {patterns.map((pattern, i) => (
-                  <div key={i} className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="font-medium text-slate-200">{pattern.pattern.replace(/_/g, ' ')}</span>
-                      <Badge variant="error">{pattern.frequency} failures</Badge>
+                {patterns.map((pattern, i) => {
+                  const targetAgentName = availableAgents.find(a => a.id === pattern.targetAgent)?.name || pattern.targetAgent?.replace(/_/g, ' ') || 'Root Orchestrator'
+                  return (
+                    <div key={i} className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-medium text-slate-200">{pattern.pattern.replace(/_/g, ' ')}</span>
+                        <Badge variant="error">{pattern.frequency} failures</Badge>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-sm text-slate-500">Type: {pattern.type}</span>
+                        <Badge variant="secondary" className="text-xs">
+                          → {targetAgentName}
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-indigo-400 mb-3">Fix: {pattern.suggestedFix}</div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => fixSinglePattern(pattern)}
+                        disabled={optimizing}
+                        className="w-full"
+                      >
+                        <Zap className="w-4 h-4 mr-2" />
+                        {optimizing ? 'Fixing...' : 'Fix This Pattern'}
+                      </Button>
                     </div>
-                    <div className="text-sm text-slate-500 mb-2">Type: {pattern.type}</div>
-                    <div className="text-sm text-indigo-400 mb-3">Fix: {pattern.suggestedFix}</div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => fixSinglePattern(pattern)}
-                      disabled={optimizing}
-                      className="w-full"
-                    >
-                      <Zap className="w-4 h-4 mr-2" />
-                      {optimizing ? 'Fixing...' : 'Fix This Pattern'}
-                    </Button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </CardContent>
@@ -696,9 +733,10 @@ export function OptimizerDashboard() {
 
 // Mock data
 const MOCK_PATTERNS = [
-  { pattern: 'missing_problem_focus', type: 'feature_obsessed', frequency: 8, suggestedFix: 'Add explicit instruction to ask about problems before features' },
-  { pattern: 'inappropriate_validation', type: 'validation_seeker', frequency: 5, suggestedFix: 'Remove "sounds great" responses, add skeptical questioning' },
-  { pattern: 'premature_tool_call', type: 'over_scoped_mvp', frequency: 4, suggestedFix: 'Gate MVP tool behind validation check' },
+  { pattern: 'missing_problem_focus', type: 'feature_obsessed', frequency: 8, suggestedFix: 'Add explicit instruction to ask about problems before features', targetAgent: 'problem_clarifier' },
+  { pattern: 'inappropriate_validation', type: 'validation_seeker', frequency: 5, suggestedFix: 'Remove "sounds great" responses, add skeptical questioning', targetAgent: 'orchestrator' },
+  { pattern: 'missing_validation_push', type: 'vague_customer', frequency: 3, suggestedFix: 'Challenge assumptions with evidence questions', targetAgent: 'assumption_hunter' },
+  { pattern: 'premature_tool_call', type: 'over_scoped_mvp', frequency: 4, suggestedFix: 'Gate MVP tool behind validation check', targetAgent: 'orchestrator' },
 ]
 
 const MOCK_VERSIONS = [

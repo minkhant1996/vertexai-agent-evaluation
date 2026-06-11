@@ -21,7 +21,7 @@ import {
 import { AgentSimulator } from '../simulation/simulator.js';
 import { cloudTrace, getAnalytics } from '../observability/cloud-trace.js';
 import { vertexTrace, getAnalytics as getVertexAnalytics } from '../observability/vertex-trace.js';
-import { AgentOptimizer } from '../optimizer/optimizer.js';
+import { AgentOptimizer, getTargetAgentForPattern } from '../optimizer/optimizer.js';
 
 import { Storage } from '@google-cloud/storage';
 
@@ -555,6 +555,74 @@ export async function handleTrack2Request(
     saveStorage();
 
     return { status: 200, data: { version: newVersion, optimization: result, evaluation: evaluationData } };
+  }
+
+  // Optimize ALL agents at once - Fix All patterns across all relevant agents
+  if (path === '/api/optimizer/optimize-all' && method === 'POST') {
+    const optimizer = new AgentOptimizer();
+    const useADK = body?.useADK === true;
+
+    // Analyze all improvable runs
+    const improvableRuns = storage.simulationRuns.filter((r: any) => {
+      if (!r.passed) return true;
+      if (r.score !== undefined && r.score < 1.0) return true;
+      return false;
+    });
+
+    if (improvableRuns.length === 0) {
+      return { status: 200, data: { results: [], summary: { totalPatterns: 0, agentsOptimized: 0 } } };
+    }
+
+    // Get all patterns with their target agents
+    const patterns = await optimizer.analyzeFailures(improvableRuns);
+
+    // Helper to get instruction for an agent
+    const getInstruction = (agentId: string): string | null => {
+      const template = getAgentTemplate(agentId);
+      return template?.instruction || null;
+    };
+
+    // Optimize all agents
+    const multiAgentResult = await optimizer.optimizeAllAgents(patterns, getInstruction);
+
+    // Create versions for each optimized agent
+    const newVersions = [];
+    const nextVersion = storage.instructionVersions.length + 1;
+
+    for (let i = 0; i < multiAgentResult.results.length; i++) {
+      const agentResult = multiAgentResult.results[i];
+      const versionNum = nextVersion + i;
+
+      const newVersion = {
+        id: `v${versionNum}`,
+        version: versionNum,
+        targetAgent: agentResult.agentId,
+        agentName: agentResult.agentName,
+        instruction: agentResult.optimization.optimizedInstruction,
+        failurePatternsAddressed: agentResult.patternsFixed,
+        passRateBefore: null,
+        passRateAfter: null,
+        isActive: false,
+        createdAt: new Date().toISOString(),
+        optimizerMethod: useADK ? 'adk_multi_agent' : 'built_in_multi_agent',
+      };
+
+      storage.instructionVersions.unshift(newVersion);
+      newVersions.push(newVersion);
+
+      console.log(`[Optimizer] Created version ${versionNum} for ${agentResult.agentId} (${agentResult.patternsFixed.length} patterns)`);
+    }
+
+    saveStorage();
+
+    return {
+      status: 200,
+      data: {
+        versions: newVersions,
+        results: multiAgentResult.results,
+        summary: multiAgentResult.summary,
+      },
+    };
   }
 
   if (path === '/api/optimizer/apply' && method === 'POST') {

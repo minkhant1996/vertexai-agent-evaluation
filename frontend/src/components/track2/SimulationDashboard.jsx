@@ -17,12 +17,15 @@ import {
   Activity,
   Pause,
   SkipForward,
+  SplitSquareHorizontal,
+  LayoutList,
 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { StatCard } from '../ui/stat-card'
 import { cn } from '../../lib/utils'
+import { DualLiveSimulation } from './DualLiveSimulation'
 
 // Use relative URL when not in development (same-origin)
 const BACKEND_URL = import.meta.env.VITE_API_URL || ''
@@ -33,6 +36,9 @@ export function SimulationDashboard() {
   const [running, setRunning] = useState(false)
   const [currentScenarioId, setCurrentScenarioId] = useState(null)
   const [expandedScenario, setExpandedScenario] = useState(null)
+
+  // View mode: 'single' for regular view, 'parallel' for dual live view
+  const [viewMode, setViewMode] = useState('single')
 
   // Selected scenario (preview mode)
   const [selectedScenario, setSelectedScenario] = useState(null)
@@ -371,15 +377,85 @@ export function SimulationDashboard() {
     }
   }
 
+  // Handle completion from parallel mode
+  const handleParallelComplete = (completedResults) => {
+    const newResults = {}
+    completedResults.forEach(r => {
+      newResults[r.scenarioId] = {
+        passed: r.passed,
+        score: r.score,
+      }
+    })
+    setResults(prev => ({ ...prev, ...newResults }))
+    fetchPreviousResults() // Refresh from server
+  }
+
+  // If in parallel mode, render the dual live view
+  if (viewMode === 'parallel') {
+    return (
+      <div className="h-full flex flex-col">
+        {/* Mode toggle header */}
+        <div className="p-3 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode('single')}
+              className="text-slate-400 hover:text-slate-200"
+            >
+              <LayoutList className="w-4 h-4 mr-2" />
+              Standard View
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="bg-indigo-500/20 text-indigo-300"
+            >
+              <SplitSquareHorizontal className="w-4 h-4 mr-2" />
+              Parallel View
+            </Button>
+          </div>
+          <div className="flex items-center gap-4 text-sm">
+            <span className="text-emerald-400">{passedCount} passed</span>
+            <span className="text-rose-400">{totalRun - passedCount} failed</span>
+            <span className={cn(
+              "font-semibold",
+              passRate >= 80 ? "text-emerald-400" : "text-amber-400"
+            )}>
+              {passRate.toFixed(0)}%
+            </span>
+          </div>
+        </div>
+        <div className="flex-1">
+          <DualLiveSimulation
+            scenarios={scenarios}
+            onComplete={handleParallelComplete}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex">
       {/* Left Panel - Scenario List */}
       <div className="w-80 border-r border-slate-800 flex flex-col bg-slate-900/50">
         <div className="p-4 border-b border-slate-800">
-          <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
-            <FlaskConical className="w-5 h-5 text-indigo-400" />
-            Scenarios
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+              <FlaskConical className="w-5 h-5 text-indigo-400" />
+              Scenarios
+            </h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode('parallel')}
+              className="text-slate-400 hover:text-indigo-400"
+              title="Switch to Parallel Live View"
+            >
+              <SplitSquareHorizontal className="w-4 h-4" />
+            </Button>
+          </div>
           <p className="text-sm text-slate-400 mt-1">{scenarios.length} edge cases</p>
         </div>
 

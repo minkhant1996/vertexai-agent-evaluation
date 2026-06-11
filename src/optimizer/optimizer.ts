@@ -22,6 +22,48 @@ export interface FailurePattern {
   frequency: number;
   examples: string[];
   suggestedFix: string;
+  targetAgent?: string; // Which agent should be fixed for this pattern
+}
+
+/**
+ * Maps failure patterns to their target agents
+ * Some patterns affect the orchestrator, others affect specific sub-agents
+ */
+export const PATTERN_TO_AGENT_MAP: Record<string, string> = {
+  // Orchestrator patterns - routing and overall behavior
+  'inappropriate_validation': 'orchestrator',
+  'premature_tool_call': 'orchestrator',
+  'near_perfect': 'orchestrator',
+  'good_but_improvable': 'orchestrator',
+  'needs_improvement': 'orchestrator',
+
+  // Problem Clarifier patterns - customer segmentation and problem focus
+  'missing_problem_focus': 'problem_clarifier',
+  'missing_focus_guidance': 'problem_clarifier',
+  'vague_customer': 'problem_clarifier',
+
+  // Assumption Hunter patterns - validation and evidence
+  'missing_validation_push': 'assumption_hunter',
+  'missing_term_validate': 'assumption_hunter',
+  'missing_term_evidence': 'assumption_hunter',
+  'missing_term_assumption': 'assumption_hunter',
+
+  // Customer Researcher patterns - interview questions
+  'missing_term_interview': 'customer_researcher',
+  'missing_term_talk': 'customer_researcher',
+  'missing_term_customer': 'customer_researcher',
+
+  // Experiment Designer patterns - MVP and planning
+  'missing_tool_define_mvp_scope': 'experiment_designer',
+  'missing_tool_create_7day_validation_plan': 'experiment_designer',
+  'over_scoped_mvp': 'experiment_designer',
+};
+
+/**
+ * Determine which agent should be fixed for a given pattern
+ */
+export function getTargetAgentForPattern(pattern: string): string {
+  return PATTERN_TO_AGENT_MAP[pattern] || 'orchestrator';
 }
 
 export interface OptimizationResult {
@@ -74,7 +116,7 @@ export class AgentOptimizer {
   constructor(projectId?: string, location?: string) {
     this.projectId = projectId || process.env.GOOGLE_CLOUD_PROJECT || '';
     this.location = location || process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-    this.model = 'gemini-2.0-flash-001';
+    this.model = 'gemini-2.5-flash-preview-05-20';
     this.vertexAI = new VertexAI({
       project: this.projectId,
       location: this.location,
@@ -135,6 +177,7 @@ export class AgentOptimizer {
             frequency: 0,
             examples: [],
             suggestedFix: '',
+            targetAgent: getTargetAgentForPattern(key),
           });
         }
 
@@ -311,6 +354,90 @@ Respond with ONLY the instruction text (no explanation, no markdown headers). Ke
       changes,
       patternsAddressed: failurePatterns.map(p => p.pattern),
       expectedImprovementPercent: this.estimateImprovement(failurePatterns),
+    };
+  }
+
+  /**
+   * Optimize ALL agents based on their relevant failure patterns.
+   * Groups patterns by target agent and applies fixes to each.
+   */
+  async optimizeAllAgents(
+    failurePatterns: FailurePattern[],
+    getInstruction: (agentId: string) => string | null
+  ): Promise<{
+    results: Array<{
+      agentId: string;
+      agentName: string;
+      patternsFixed: string[];
+      optimization: OptimizationResult;
+    }>;
+    summary: {
+      totalPatterns: number;
+      agentsOptimized: number;
+      patternsByAgent: Record<string, number>;
+    };
+  }> {
+    // Group patterns by target agent
+    const patternsByAgent = new Map<string, FailurePattern[]>();
+
+    for (const pattern of failurePatterns) {
+      const targetAgent = pattern.targetAgent || getTargetAgentForPattern(pattern.pattern);
+      if (!patternsByAgent.has(targetAgent)) {
+        patternsByAgent.set(targetAgent, []);
+      }
+      patternsByAgent.get(targetAgent)!.push(pattern);
+    }
+
+    console.log(`[Optimizer] Optimizing ${patternsByAgent.size} agents for ${failurePatterns.length} patterns`);
+
+    const results: Array<{
+      agentId: string;
+      agentName: string;
+      patternsFixed: string[];
+      optimization: OptimizationResult;
+    }> = [];
+
+    const agentNames: Record<string, string> = {
+      orchestrator: 'Root Orchestrator',
+      problem_clarifier: 'Problem Clarifier',
+      assumption_hunter: 'Assumption Hunter',
+      customer_researcher: 'Customer Researcher',
+      experiment_designer: 'Experiment Designer',
+    };
+
+    // Optimize each agent
+    for (const [agentId, patterns] of patternsByAgent) {
+      const instruction = getInstruction(agentId);
+      if (!instruction) {
+        console.warn(`[Optimizer] No instruction found for agent: ${agentId}`);
+        continue;
+      }
+
+      console.log(`[Optimizer] Optimizing ${agentId} with ${patterns.length} patterns`);
+
+      const optimization = await this.optimizeInstruction(instruction, patterns);
+
+      results.push({
+        agentId,
+        agentName: agentNames[agentId] || agentId,
+        patternsFixed: patterns.map(p => p.pattern),
+        optimization,
+      });
+    }
+
+    // Build summary
+    const patternCountByAgent: Record<string, number> = {};
+    for (const [agentId, patterns] of patternsByAgent) {
+      patternCountByAgent[agentId] = patterns.length;
+    }
+
+    return {
+      results,
+      summary: {
+        totalPatterns: failurePatterns.length,
+        agentsOptimized: results.length,
+        patternsByAgent: patternCountByAgent,
+      },
     };
   }
 

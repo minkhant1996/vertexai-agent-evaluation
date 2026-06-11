@@ -63,7 +63,7 @@ export class VertexEvaluationClient {
   }) {
     this.projectId = options?.projectId || process.env.GOOGLE_CLOUD_PROJECT || '';
     this.location = options?.location || process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-    this.model = options?.model || 'gemini-2.0-flash-001';
+    this.model = options?.model || 'gemini-2.5-flash-preview-05-20';
 
     this.vertexAI = new VertexAI({
       project: this.projectId,

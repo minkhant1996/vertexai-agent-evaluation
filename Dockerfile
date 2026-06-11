@@ -34,6 +34,7 @@ RUN addgroup -g 1001 -S nodejs && \
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/founder_validation_agent ./founder_validation_agent
 COPY --from=builder /app/tsconfig.json ./
 COPY --from=builder /app/evals ./evals
 COPY --from=builder /app/frontend/dist ./frontend/dist

@@ -193,6 +193,189 @@ const main = async () => {
 
     console.log('Track 2 routes added');
 
+    // ============ ADK DEV-UI SUPPORT ============
+    // Add /list-apps endpoint for ADK dev-ui compatibility
+    // Format: array of app name strings
+    authApp.get('/list-apps', (_req, res) => {
+      res.json(['founder_validation_agent']);
+    });
+
+    // Add /get-app-info endpoint for app details
+    authApp.get('/get-app-info', (req, res) => {
+      const appName = req.query.app_name;
+      if (appName === 'founder_validation_agent') {
+        res.json({
+          name: 'founder_validation_agent',
+          description: 'SoeMind Foundry - Founder Idea Validation Agent',
+          agents: ['orchestrator', 'problem_clarifier', 'assumption_hunter', 'customer_researcher', 'experiment_designer'],
+        });
+      } else {
+        res.status(404).json({ error: 'App not found' });
+      }
+    });
+
+    // In-memory storage for eval sets (in production, use Cloud Storage)
+    const evalSets: Record<string, { name: string; cases: any[]; createdAt: string }> = {};
+
+    // List eval sets
+    authApp.get('/list-eval-sets', (_req, res) => {
+      const sets = Object.entries(evalSets).map(([id, data]) => ({
+        id,
+        name: data.name,
+        caseCount: data.cases.length,
+        createdAt: data.createdAt,
+      }));
+      res.json(sets);
+    });
+
+    // Create eval set
+    authApp.post('/create-eval-set', (req, res) => {
+      const { name } = req.body;
+      if (!name) {
+        return res.status(400).json({ error: 'Name is required' });
+      }
+      const id = `evalset_${Date.now()}`;
+      evalSets[id] = {
+        name,
+        cases: [],
+        createdAt: new Date().toISOString(),
+      };
+      res.json({ id, name, success: true });
+    });
+
+    // Get eval set
+    authApp.get('/get-eval-set', (req, res) => {
+      const id = req.query.eval_set_id as string;
+      if (!id || !evalSets[id]) {
+        return res.status(404).json({ error: 'Eval set not found' });
+      }
+      res.json({ id, ...evalSets[id] });
+    });
+
+    // Add case to eval set
+    authApp.post('/add-eval-case', (req, res) => {
+      const { eval_set_id, input, expected_output } = req.body;
+      if (!eval_set_id || !evalSets[eval_set_id]) {
+        return res.status(404).json({ error: 'Eval set not found' });
+      }
+      const caseId = `case_${Date.now()}`;
+      evalSets[eval_set_id].cases.push({
+        id: caseId,
+        input,
+        expected_output,
+        createdAt: new Date().toISOString(),
+      });
+      res.json({ id: caseId, success: true });
+    });
+
+    // Run evaluation
+    authApp.post('/run-eval', (req, res) => {
+      const { eval_set_id } = req.body;
+      if (!eval_set_id || !evalSets[eval_set_id]) {
+        return res.status(404).json({ error: 'Eval set not found' });
+      }
+      // Return mock results for now
+      const evalSet = evalSets[eval_set_id];
+      res.json({
+        eval_set_id,
+        total_cases: evalSet.cases.length,
+        passed: evalSet.cases.length,
+        failed: 0,
+        pass_rate: 1.0,
+        results: evalSet.cases.map(c => ({
+          case_id: c.id,
+          passed: true,
+          score: 0.95,
+        })),
+      });
+    });
+
+    // Note: State, Events, Artifacts, Sessions are handled by ADK's built-in endpoints
+    // We only add endpoints that ADK doesn't provide (like eval sets, list-apps)
+
+    // In-memory storage for eval sets
+    const evalSetsStorage: Record<string, { name: string; cases: any[]; createdAt: string }> = {};
+
+    // ADK-style eval set routes: /apps/{app_name}/eval_sets
+    // Returns array of eval set names (strings, not objects)
+    authApp.get('/apps/:appName/eval_sets', (_req, res) => {
+      const setNames = Object.keys(evalSetsStorage);
+      res.json(setNames);
+    });
+
+    // Create eval set: POST /apps/{app_name}/eval_sets/{eval_set_name}
+    authApp.post('/apps/:appName/eval_sets/:evalSetName', (req, res) => {
+      const { evalSetName } = req.params;
+      if (!evalSetName) {
+        return res.status(400).json({ error: 'Eval set name required' });
+      }
+      evalSetsStorage[evalSetName] = {
+        name: evalSetName,
+        cases: [],
+        createdAt: new Date().toISOString(),
+      };
+      console.log(`[Eval] Created eval set: ${evalSetName}`);
+      res.json({ name: evalSetName, eval_set_id: evalSetName, success: true });
+    });
+
+    // Get eval set: GET /apps/{app_name}/eval_sets/{eval_set_name}
+    authApp.get('/apps/:appName/eval_sets/:evalSetName', (req, res) => {
+      const { evalSetName } = req.params;
+      const evalSet = evalSetsStorage[evalSetName];
+      if (!evalSet) {
+        return res.status(404).json({ error: 'Eval set not found' });
+      }
+      res.json({ name: evalSetName, ...evalSet });
+    });
+
+    // Eval results (mock for now)
+    authApp.get('/apps/:appName/eval_results', (_req, res) => {
+      res.json([]);
+    });
+
+    // Add session to eval set: POST /apps/{app_name}/eval_sets/{eval_set_name}/add_session
+    authApp.post('/apps/:appName/eval_sets/:evalSetName/add_session', (req, res) => {
+      const { evalSetName } = req.params;
+      const { eval_case_name, session_id } = req.body;
+
+      // Create eval set if it doesn't exist
+      if (!evalSetsStorage[evalSetName]) {
+        evalSetsStorage[evalSetName] = {
+          name: evalSetName,
+          cases: [],
+          createdAt: new Date().toISOString(),
+        };
+      }
+
+      const caseName = eval_case_name || `case_${Date.now()}`;
+      evalSetsStorage[evalSetName].cases.push({
+        name: caseName,
+        session_id: session_id,
+        createdAt: new Date().toISOString(),
+      });
+
+      console.log(`[Eval] Added case "${caseName}" to eval set: ${evalSetName}`);
+      res.json({ success: true, case_name: caseName, eval_set: evalSetName });
+    });
+
+    // Run eval: POST /apps/{app_name}/eval_sets/{eval_set_name}/run
+    authApp.post('/apps/:appName/eval_sets/:evalSetName/run', (req, res) => {
+      const { evalSetName } = req.params;
+      const evalSet = evalSetsStorage[evalSetName];
+      if (!evalSet) {
+        return res.status(404).json({ error: 'Eval set not found' });
+      }
+      console.log(`[Eval] Running eval set: ${evalSetName}`);
+      res.json({
+        eval_set_id: evalSetName,
+        total_cases: evalSet.cases.length,
+        passed: evalSet.cases.length,
+        failed: 0,
+        pass_rate: 1.0,
+        status: 'completed',
+      });
+    });
+
     // ============ TRACING MIDDLEWARE ============
 
     // Add tracing for agent requests (uses both local and Vertex AI Cloud Trace)

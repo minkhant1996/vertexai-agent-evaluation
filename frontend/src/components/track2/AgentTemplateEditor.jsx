@@ -142,6 +142,19 @@ export function AgentTemplateEditor() {
 
   const templateVars = selectedTemplate ? extractVariables(editedInstruction) : [];
 
+  // Live rendered instruction (auto-updates when variables change)
+  const renderedInstruction = React.useMemo(() => {
+    let rendered = editedInstruction;
+    Object.entries(variables).forEach(([key, value]) => {
+      // Replace {{variable:default}} with the value (or default if empty)
+      rendered = rendered.replace(
+        new RegExp(`\\{\\{${key}(?::([^}]*))?\\}\\}`, 'g'),
+        (match, defaultVal) => value || defaultVal || ''
+      );
+    });
+    return rendered;
+  }, [editedInstruction, variables]);
+
   const getAgentColor = (id) => {
     const colors = {
       orchestrator: 'from-violet-500 to-purple-600',
@@ -250,19 +263,31 @@ export function AgentTemplateEditor() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Code className="w-4 h-4 text-violet-400" />
-                    Instruction Template
+                    Agent Instruction
                   </CardTitle>
                   <CardDescription>
-                    Use {'{{variable:default}}'} for dynamic values
+                    Use {'{{variable:default}}'} syntax. Variables will be replaced with values.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Textarea
-                    value={editedInstruction}
-                    onChange={(e) => setEditedInstruction(e.target.value)}
-                    rows={15}
-                    className="font-mono text-sm"
-                  />
+                  {/* Live Rendered Preview */}
+                  <div className="bg-slate-800 rounded-lg p-4 text-slate-200 text-sm whitespace-pre-wrap max-h-[300px] overflow-y-auto font-mono mb-4 border border-slate-700">
+                    {renderedInstruction || 'Enter instruction template above...'}
+                  </div>
+
+                  {/* Collapsible Raw Template Editor */}
+                  <details className="group">
+                    <summary className="cursor-pointer text-sm text-slate-400 hover:text-slate-300 flex items-center gap-2 mb-2">
+                      <Code className="w-4 h-4" />
+                      Edit Raw Template
+                    </summary>
+                    <Textarea
+                      value={editedInstruction}
+                      onChange={(e) => setEditedInstruction(e.target.value)}
+                      rows={12}
+                      className="font-mono text-sm"
+                    />
+                  </details>
                 </CardContent>
               </Card>
 
