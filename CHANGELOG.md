@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
   - Inference execution with traces
   - Multi-turn AutoRaters (MULTI_TURN_TASK_SUCCESS, TOOL_USE_QUALITY, TRAJECTORY_QUALITY)
   - Loss cluster analysis (Auto-Loss Analysis)
-  - GEPA algorithm optimization
+  - LLM-assisted instruction optimization (GEPA scaffold; Gemini rewrite today)
 - **Real A/B Testing**: Replaced mock testing with actual Gemini-based evaluation
   - Per-scenario score comparison
   - Side-by-side response previews

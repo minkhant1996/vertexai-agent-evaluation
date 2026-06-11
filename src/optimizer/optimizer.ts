@@ -501,14 +501,16 @@ Respond with ONLY the instruction text (no explanation, no markdown headers). Ke
   }
 
   /**
-   * Run Google's Quality Flywheel workflow:
+   * Run a Quality Flywheel workflow modeled on Google's Agent Platform:
    * 1. Generate eval scenarios (User Simulation)
    * 2. Run inferences against agent
    * 3. Compute metrics (AutoRaters: MULTI_TURN_TASK_SUCCESS, TOOL_USE_QUALITY)
    * 4. Generate loss clusters (Auto-Loss Analysis)
-   * 5. Optimize with GEPA algorithm
+   * 5. LLM-assisted instruction optimization (Gemini rewrite; not Google's GEPA)
    *
-   * This is the full Google-style agent evaluation and optimization.
+   * NOTE: today this path runs scripts/vertex_evaluation.py, which produces
+   * metrics/clusters/optimization via Gemini. For the REAL Vertex Gen AI
+   * Evaluation Service scores, use eval/collect_agent_runs.py + eval/real_eval.py.
    */
   async runQualityFlywheel(
     currentInstruction: string,
@@ -530,7 +532,7 @@ Respond with ONLY the instruction text (no explanation, no markdown headers). Ke
 
       const command = `python3 "${scriptPath}" --instruction "${escapedInstruction}" --scenarios ${scenarioCount} --mode full`;
 
-      console.log(`[Quality Flywheel] Running Vertex AI evaluation pipeline...`);
+      console.log(`[Quality Flywheel] Running Gemini-based evaluation pipeline (see eval/real_eval.py for the real Vertex eval service)...`);
       const { stdout, stderr } = await execAsync(command, {
         timeout: 300000, // 5 minute timeout (evaluation takes longer)
         maxBuffer: 20 * 1024 * 1024, // 20MB buffer

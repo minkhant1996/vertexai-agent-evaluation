@@ -53,8 +53,16 @@ storage-backup*.json
 # ===========================================
 eval/results/
 eval/traces/
+eval/output/
 evals/results/
 evals/traces/
+
+# ===========================================
+# Vendored reference (kept locally, not committed)
+# ===========================================
+# Full Google ADK source (~13MB, own nested .git). We depend on @google/adk via
+# npm; this folder is reference-only and not part of the build. See NOTICE.
+adk-js/
 
 # ===========================================
 # Prisma

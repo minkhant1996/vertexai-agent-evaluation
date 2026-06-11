@@ -1,0 +1,42 @@
+SoeMind Foundry: Founder Validation Agent
+Copyright 2024-2026 SoeMind Foundry
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes and/or depends on third-party software:
+
+--------------------------------------------------------------------------------
+Google Agent Development Kit (ADK)
+--------------------------------------------------------------------------------
+- Used as a dependency: "@google/adk", "@google/adk-devtools" (npm)
+  Source: https://github.com/google/adk-js
+  Copyright Google LLC. Licensed under the Apache License, Version 2.0.
+  The agent orchestrator and sub-agents in this project are built on ADK
+  primitives (LlmAgent, FunctionTool, GOOGLE_SEARCH).
+- A full ADK source clone may be kept locally under adk-js/ for reference. It is
+  unmodified, not part of this project's build, and is git-ignored (not redistributed
+  in this repository).
+
+--------------------------------------------------------------------------------
+Google Cloud Vertex AI / Gemini Agent Platform SDKs
+--------------------------------------------------------------------------------
+- "google-cloud-aiplatform[adk,evaluation]" (PyPI), "@google-cloud/vertexai" (npm),
+  "google-genai" (PyPI)
+  Copyright Google LLC. Licensed under the Apache License, Version 2.0.
+  Used for the Gen AI Evaluation Service (client.evals.evaluate) and Gemini models.
+
+--------------------------------------------------------------------------------
+Google Cloud generative-ai samples (notebooks)
+--------------------------------------------------------------------------------
+- Reference notebooks under: docs/notebooks/
+  Source: https://github.com/GoogleCloudPlatform/generative-ai
+  Copyright Google LLC. Licensed under the Apache License, Version 2.0.
+  Unmodified copies retained for reference.
+
+--------------------------------------------------------------------------------
+Methodologies referenced (concepts, not code)
+--------------------------------------------------------------------------------
+The Mom Test (Rob Fitzpatrick), The Lean Startup (Eric Ries), Inspired (Marty
+Cagan), The Lean Product Playbook (Dan Olsen), and the Y Combinator Startup
+Library inform the agent's coaching logic. No copyrighted text from these works is
+redistributed.

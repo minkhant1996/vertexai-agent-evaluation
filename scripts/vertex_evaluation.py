@@ -151,8 +151,9 @@ class VertexAgentEvaluator:
                     types.RubricMetric.MULTI_TURN_TRAJECTORY_QUALITY,
                 ]
 
+            # Official SDK kwarg is `dataset=` (not `traces=`); the dataset carries the traces.
             eval_result = self.client.evals.evaluate(
-                traces=traces,
+                dataset=traces,
                 metrics=metrics,
                 config={"evaluation_service_qps": 5.0},
             )
@@ -226,10 +227,11 @@ class VertexAgentEvaluator:
         targets: list = None
     ) -> dict:
         """
-        Step 5: Optimize the agent using GEPA algorithm.
+        Step 5: Optimize the agent via the Vertex prompt optimizer.
 
-        Uses client.optimizer.optimize() to programmatically refine
-        system instructions based on failure data.
+        Uses client.prompt_optimizer.optimize() to programmatically refine
+        system instructions based on failure data. (Note: there is no
+        `client.optimizer` namespace; the correct accessor is `prompt_optimizer`.)
         """
         if not VERTEX_AVAILABLE:
             return {"error": IMPORT_ERROR, "fallback": True}
@@ -238,7 +240,7 @@ class VertexAgentEvaluator:
             if targets is None:
                 targets = ["system_prompt"]
 
-            optimize_result = self.client.optimizer.optimize(
+            optimize_result = self.client.prompt_optimizer.optimize(
                 targets=targets,
                 benchmark=eval_result,
                 tests=eval_dataset,
@@ -354,10 +356,11 @@ Output as JSON:
         except:
             results["steps"]["evaluate"] = {"success": False, "raw": eval_text}
 
-        # Step 5: Optimize using GEPA-style approach
+        # Step 5: LLM-assisted instruction optimization (Gemini rewrite).
+        # NOTE: This is not Google's GEPA algorithm; it is an LLM rewrite pass.
         print("[Quality Flywheel] Optimizing agent instruction...")
 
-        optimize_prompt = f"""You are using the GEPA (Genetic Evolution Prompt Algorithm) to optimize this AI agent instruction.
+        optimize_prompt = f"""You are optimizing this AI agent instruction by rewriting it to address the identified failure patterns.
 
 CURRENT INSTRUCTION:
 {agent_instruction}

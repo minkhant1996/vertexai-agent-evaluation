@@ -56,9 +56,9 @@ A multi-agent orchestration system that guides founders through rigorous idea va
 │  │        (Root Agent)             │  │   (Python Scripts)         ││
 │  └───────────────┬─────────────────┘  │                            ││
 │                  │                    │  • Scenario Generation     ││
-│         A2A Protocol                  │  • Vertex AI Evaluation    ││
+│         A2A Protocol                  │  • Gemini-based Evaluation  ││
 │                  │                    │  • Loss Cluster Analysis   ││
-│    ┌─────────────┼─────────────┐      │  • GEPA Optimization       ││
+│    ┌─────────────┼─────────────┐      │  • LLM-based Optimization  ││
 │    │             │             │      └────────────────────────────┘│
 │    ▼             ▼             ▼                                    │
 │ ┌────────┐ ┌──────────┐ ┌──────────┐                               │
@@ -76,11 +76,26 @@ A multi-agent orchestration system that guides founders through rigorous idea va
                               │
                               ▼
                     ┌───────────────┐
-                    │  Gemini 2.0   │
+                    │  Gemini 2.5   │
                     │    Flash      │
                     │  (Vertex AI)  │
                     └───────────────┘
 ```
+
+### How this maps to Google's stack
+
+| Layer | What we use | Real or modeled? |
+|---|---|---|
+| **Agent framework** | Google **ADK** (`@google/adk`) — the orchestrator and all 4 sub-agents are ADK `LlmAgent`s; tools are ADK `FunctionTool`s; runs on `adk web` | ✅ Real ADK |
+| **Model** | Gemini 2.5 Flash via **Vertex AI** | ✅ Real |
+| **Evaluation** | Two paths: (a) a bundled Gemini judge used in the live UI, and (b) the **real Vertex Gen AI Evaluation Service** via `eval/real_eval.py` (`client.evals.evaluate`) | (a) Gemini · (b) ✅ Real service — see [Evaluation](#evaluation) |
+| **Optimization** | LLM-assisted instruction rewriting (Gemini); ADK `SimplePromptOptimizer` scaffolded | LLM rewrite (not GEPA) |
+| **Deployment** | Google **Cloud Run** | ✅ Real |
+
+> We are transparent about which steps call Google's managed services vs. which are
+> Gemini-powered approximations — see the *Implementation status* sections in
+> [docs/GENAI_EVALUATION_SERVICE.md](./docs/GENAI_EVALUATION_SERVICE.md#implementation-status-in-this-project)
+> and [docs/OPTIMIZE_AGENT_PROMPTS.md](./docs/OPTIMIZE_AGENT_PROMPTS.md#implementation-status-in-this-project).
 
 ### Multi-Agent System
 
@@ -141,7 +156,7 @@ Full tracing of agent behavior:
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐      │
 │  │   Step 5    │◀───│   Step 4    │◀───│   Loss      │      │
 │  │  Optimize   │    │   Analyze   │    │  Clusters   │      │
-│  │   (GEPA)    │    │  Failures   │    │             │      │
+│  │   (LLM)     │    │  Failures   │    │             │      │
 │  └─────────────┘    └─────────────┘    └─────────────┘      │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -151,8 +166,14 @@ Full tracing of agent behavior:
 | Method | Speed | Quality | Description |
 |--------|-------|---------|-------------|
 | **Built-in** | Fast (~5s) | Good | Pattern matching + Gemini rewrite |
-| **Google ADK** | Medium (~30s) | Better | ADK optimizer with GEPA algorithm |
-| **Quality Flywheel** | Slow (~2-5min) | Best | Full 5-step Google workflow |
+| **Google ADK** | Medium (~30s) | Better | ADK `SimplePromptOptimizer` scaffold (Gemini-driven rewrite today) |
+| **Quality Flywheel** | Slow (~2-5min) | Best | 5-step workflow modeled on Google's Agent Platform |
+
+> **Implementation note:** "Optimization" today is **LLM-assisted instruction rewriting**
+> (Gemini), not Google's GEPA algorithm. Evaluation scores can be produced either by the
+> bundled Gemini judge or, via `eval/real_eval.py`, by the **real Vertex Gen AI Evaluation
+> Service** (`client.evals.evaluate`). See
+> [docs/OPTIMIZE_AGENT_PROMPTS.md](./docs/OPTIMIZE_AGENT_PROMPTS.md#implementation-status-in-this-project).
 
 **Features:**
 - **Failure Pattern Detection**: Automatically identifies issues (hallucination, instruction following, tool calling)
@@ -186,16 +207,54 @@ Your validation_depth is {{depth:thorough}}.
 
 ---
 
+## Evaluation
+
+Track 2 is about measuring and improving agent quality. We support **two evaluation paths**,
+and we are explicit about which is which:
+
+| Path | What it is | Use |
+|---|---|---|
+| **Live UI judge** | A Gemini-based rater wired into the Simulation / A/B dashboards | Fast, in-app scoring during the demo |
+| **Real Vertex eval** | The genuine **Gen AI Evaluation Service** (`client.evals.evaluate` with adaptive `RubricMetric`s) | Authoritative, reproducible scores |
+
+### Run the real Vertex evaluation locally (no cloud hosting required)
+
+The agent runs locally via ADK; only the eval *service* is called as an API.
+
+```bash
+# 0. one-time auth (the eval service + Vertex model need ADC)
+gcloud auth application-default login
+
+# 1. start the local ADK agent (terminal 1)
+PORT=8101 npx adk web --port 8101
+
+# 2. collect real (prompt, response, tool-trajectory) runs (terminal 2)
+AGENT_BASE_URL=http://localhost:8101 python3 eval/collect_agent_runs.py
+
+# 3. score them with the real Gen AI Evaluation Service
+python3 eval/real_eval.py        # writes eval/results/real_eval_<ts>.json
+```
+
+`eval/collect_agent_runs.py` drives the agent over the local ADK server; `eval/real_eval.py`
+calls `client.evals.evaluate(dataset=df, metrics=[RubricMetric.GENERAL_QUALITY, ...])`,
+faithful to Google's [official quick-start notebook](docs/notebooks/quick_start_gen_ai_eval.ipynb).
+
+> Multi-turn agent raters and loss-cluster analysis are **Preview** features of the Agent
+> Platform and may require allowlisting on your project; the single-turn rubric path above is
+> generally available.
+
+---
+
 ## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
-| **Agent Framework** | Google Agent Development Kit (ADK) |
-| **LLM** | Gemini 2.0 Flash (Vertex AI) |
+| **Agent Framework** | Google Agent Development Kit (ADK) — `@google/adk` (`LlmAgent`, `FunctionTool`, `GOOGLE_SEARCH`) |
+| **LLM** | Gemini 2.5 Flash (Vertex AI) |
 | **Runtime** | Node.js 22 + TypeScript |
 | **Frontend** | React 18 + Vite + Tailwind CSS |
 | **Backend** | Express.js |
-| **Optimizer** | Python + google-cloud-aiplatform[adk,evaluation] |
+| **Evaluation** | Vertex Gen AI Evaluation Service (`client.evals.evaluate`) + Python `google-cloud-aiplatform[evaluation]` |
 | **Deployment** | Google Cloud Run |
 | **Protocol** | A2A (Agent-to-Agent) |
 
@@ -221,31 +280,35 @@ cd founder-validate-agent
 npm install
 cd frontend && npm install && cd ..
 
-# Install Python dependencies (for Quality Flywheel)
-pip install google-cloud-aiplatform[adk,evaluation] google-genai
+# Install Python dependencies (for evaluation + optimizer)
+pip install "google-cloud-aiplatform[adk,evaluation]" google-genai python-dotenv
 
-# Set environment variables
-export GOOGLE_API_KEY="your-api-key"
-export GOOGLE_CLOUD_PROJECT="your-project-id"
+# Configure environment
+cp .env.example .env
+# then edit .env — set GOOGLE_CLOUD_PROJECT, keep GOOGLE_GENAI_USE_VERTEXAI=1
+# (Vertex mode), and run: gcloud auth application-default login
 ```
 
 ### Running Locally
 
 ```bash
-# Build and run
-npm run build
-npm start
+# One command (starts backend/agent on 8101 + frontend on 8100):
+./start.sh
 
-# Or run in development mode
-npm run dev
+# Or manually:
+PORT=8101 npx adk web --port 8101      # ADK agent runtime
+npm run dev                            # frontend (8100)
 ```
 
 ### Access
 
 | URL | Description |
 |-----|-------------|
-| http://localhost:8080 | Main UI (Chat, Simulation, Templates, Optimizer) |
-| http://localhost:8080/track2 | Track 2 Optimizer Dashboard |
+| http://localhost:8100 | Main UI (Chat, Simulation, Templates, Optimizer) |
+| http://localhost:8100/track2 | Track 2 Optimizer Dashboard |
+| http://localhost:8101 | ADK agent runtime (`adk web`) |
+
+> On Cloud Run the app is served on port **8080**; locally it's **8100** (UI) / **8101** (agent).
 
 ---
 
@@ -272,46 +335,73 @@ gcloud run deploy founder-validation-agent \
 ## Project Structure
 
 ```
-founder-validate-agent/
+vertexai-agent-evaluation/
 ├── src/
-│   ├── agent.ts                  # Root orchestrator agent
+│   ├── agent.ts                      # Root orchestrator (ADK LlmAgent)
 │   ├── agents/
 │   │   ├── problem-clarifier.ts
 │   │   ├── assumption-hunter.ts
 │   │   ├── customer-researcher.ts
 │   │   ├── experiment-designer.ts
-│   │   └── agent-templates.ts    # Agent instruction templates
-│   ├── tools/
-│   │   └── validation-tools.ts   # Tool definitions
+│   │   ├── agent-templates.ts        # Agent instruction templates
+│   │   └── index.ts                  # Agent registry + A2A cards
+│   ├── tools/                        # ADK FunctionTools (one per file)
+│   │   ├── clarify-idea.tool.ts
+│   │   ├── identify-assumptions.tool.ts
+│   │   ├── interview-questions.tool.ts
+│   │   ├── mvp-scope.tool.ts
+│   │   ├── validation-plan.tool.ts
+│   │   └── index.ts
 │   ├── simulation/
-│   │   ├── simulator.ts          # Simulation engine
-│   │   ├── edge-cases.ts         # 20 test scenarios
-│   │   └── templates.ts          # Prompt templates
+│   │   ├── simulator.ts              # Simulation engine
+│   │   ├── edge-cases.ts             # 20 test scenarios
+│   │   └── templates.ts              # Prompt templates
 │   ├── optimizer/
-│   │   └── optimizer.ts          # Optimization engine (Built-in, ADK, Flywheel)
+│   │   └── optimizer.ts              # Optimization engine (Built-in, ADK, Flywheel)
+│   ├── evaluation/
+│   │   └── vertex-evaluation.ts      # Gemini-based judge (live UI scoring)
 │   ├── api/
-│   │   ├── server.ts             # Express API server
-│   │   ├── track2-api.ts         # Track 2 endpoints
+│   │   ├── server.ts                 # Express API server
+│   │   ├── track2-api.ts             # Track 2 endpoints
 │   │   └── streaming-simulation.ts
-│   └── observability/
-│       └── cloud-trace.ts        # Tracing integration
+│   ├── observability/
+│   │   ├── cloud-trace.ts            # Cloud Trace integration
+│   │   ├── tracing.ts
+│   │   └── vertex-trace.ts
+│   ├── middleware/guardrails.ts      # Input/output guardrails
+│   ├── security/secrets.ts           # Secret Manager integration
+│   └── gemini/                        # Cost calculator + model benchmark
+├── eval/
+│   ├── collect_agent_runs.py         # Drive local ADK agent → agent_runs.jsonl
+│   ├── real_eval.py                  # REAL Vertex eval (client.evals.evaluate)
+│   ├── vertex_eval.py                # Full Vertex eval pipeline (SDK)
+│   ├── run_eval.py                   # Local HTTP eval harness
+│   ├── eval_cases.json / eval_dataset.json
 ├── scripts/
-│   ├── vertex_evaluation.py      # Quality Flywheel implementation
-│   └── adk_optimizer.py          # Google ADK optimizer
+│   ├── vertex_evaluation.py          # Quality Flywheel (Gemini-based today)
+│   └── adk_optimizer.py              # ADK SimplePromptOptimizer scaffold
 ├── frontend/
 │   └── src/
 │       ├── App.jsx
 │       └── components/track2/
+│           ├── Track2Dashboard.jsx
 │           ├── SimulationDashboard.jsx
+│           ├── DualLiveSimulation.jsx
+│           ├── AgentArchitecture.jsx
 │           ├── TemplateEditor.jsx
 │           ├── AgentTemplateEditor.jsx
 │           ├── TraceViewer.jsx
 │           └── OptimizerDashboard.jsx
-├── docs/
-│   ├── README.md                 # Documentation index
-│   ├── QUICKSTART.md             # Getting started guide
-│   ├── OPTIMIZER_SYSTEM.md       # Full architecture docs
-│   └── API_REFERENCE.md          # API endpoint reference
+├── docs/                             # Reference docs + Vertex eval notebooks
+│   ├── README.md                     # Documentation index
+│   ├── CHALLENGE_RESOURCE_GUIDE.md   # Hackathon tracks / judging criteria
+│   ├── OPTIMIZER_SYSTEM.md / API_REFERENCE.md / QUICKSTART.md
+│   ├── GENAI_EVALUATION_SERVICE.md … ONLINE_MONITORS.md   # Agent Platform refs
+│   └── notebooks/                    # 41 official Vertex eval notebooks
+├── adk-js/                           # Google ADK source (local reference, git-ignored; see NOTICE)
+├── TRACK2_IMPLEMENTATION_CHECKLIST.md
+├── SUBMISSION_TODO.md
+├── NOTICE                            # Third-party attribution
 └── package.json
 ```
 
@@ -400,7 +490,8 @@ Built on proven methodologies:
 
 ## License
 
-Copyright 2024 SoeMind Foundry. All rights reserved.
+Licensed under the **Apache License 2.0** — see [LICENSE](./LICENSE).
 
-This code is submitted for Google for Startups AI Agents Challenge evaluation purposes only.
-No license is granted for commercial use, modification, or distribution without explicit permission.
+This project is built on Google's **Agent Development Kit (ADK)** (`@google/adk`,
+Apache-2.0) and the Vertex AI / Gemini Agent Platform SDKs. Third-party components retain
+their own licenses; see [NOTICE](./NOTICE) for attribution.

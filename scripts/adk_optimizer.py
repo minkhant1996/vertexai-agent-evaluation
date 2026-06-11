@@ -75,7 +75,12 @@ async def optimize_with_adk(
     batch_size: int = 5
 ) -> dict:
     """
-    Use Google ADK's SimplePromptOptimizer to improve agent instructions.
+    Improve agent instructions via LLM-assisted rewriting.
+
+    NOTE: This scaffolds ADK's SimplePromptOptimizer but does not yet invoke it;
+    the rewrite is performed by Gemini. Returned `method` is "llm_instruction_rewrite"
+    and `adk_optimizer_invoked` is False. To make this a true ADK optimization, call
+    `SimplePromptOptimizer.optimize(...)` with a proper Agent + Sampler.
 
     Args:
         current_instruction: The current agent system instruction
@@ -155,7 +160,11 @@ OPTIMIZED INSTRUCTION:"""
             "original_length": len(current_instruction),
             "optimized_length": len(optimized_instruction),
             "patterns_addressed": [p.get("pattern") for p in failure_patterns],
-            "method": "adk_gemini_optimizer",
+            # Honest labeling: the SimplePromptOptimizer above is constructed as a
+            # scaffold but NOT invoked. The actual rewrite below is done by Gemini.
+            # This is LLM-assisted instruction rewriting, not Google's GEPA algorithm.
+            "method": "llm_instruction_rewrite",
+            "adk_optimizer_invoked": False,
             "iterations": num_iterations
         }
 

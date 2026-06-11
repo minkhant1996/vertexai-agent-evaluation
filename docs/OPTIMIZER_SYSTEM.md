@@ -122,7 +122,7 @@ class AgentOptimizer {
 | Method | Speed | Quality | Description |
 |--------|-------|---------|-------------|
 | Built-in | Fast | Good | Pattern matching + Gemini rewrite |
-| ADK | Medium | Better | Google ADK with GEPA algorithm |
+| ADK | Medium | Better | ADK `SimplePromptOptimizer` scaffold (Gemini rewrite today) |
 | Quality Flywheel | Slow | Best | Full 5-step Google workflow |
 
 ### 3. Python Scripts
@@ -190,7 +190,7 @@ class VertexAgentEvaluator:
         targets: list = None
     ) -> dict:
         """
-        Step 5: Optimize using GEPA algorithm.
+        Step 5: Optimize via LLM-assisted instruction rewriting (GEPA scaffold).
         Programmatically refines system instructions.
         """
 ```
@@ -382,7 +382,7 @@ The Quality Flywheel is Google's recommended approach for continuous agent impro
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐      │
 │  │   Step 5    │◀───│   Step 4    │◀───│   Loss      │      │
 │  │  Optimize   │    │   Analyze   │    │  Clusters   │      │
-│  │   (GEPA)    │    │  Failures   │    │             │      │
+│  │   (LLM)     │    │  Failures   │    │             │      │
 │  └─────────────┘    └─────────────┘    └─────────────┘      │
 │         │                                                    │
 │         └────────────────────────────────────────────────────┤
@@ -412,8 +412,8 @@ Groups failures by category:
 - **Tool Calling**: Wrong tool or parameters
 - **Tool Output Handling**: Misinterpreted tool results
 
-### Step 5: GEPA Optimization
-- Genetic Evolution Prompt Algorithm
+### Step 5: Instruction Optimization
+- LLM-assisted instruction rewriting (GEPA scaffold; Gemini rewrite today)
 - Iteratively refines instructions
 - Addresses specific failure patterns
 
@@ -484,7 +484,7 @@ const result = await fetch('/api/optimizer/analyze', {
 // Result includes:
 // - patterns: detected failure patterns
 // - evaluation: { metrics, loss_clusters }
-// - optimizedInstruction: GEPA-optimized instruction
+// - optimizedInstruction: LLM-optimized instruction
 ```
 
 ### A/B Testing

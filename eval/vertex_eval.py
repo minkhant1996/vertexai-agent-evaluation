@@ -31,7 +31,7 @@ from typing import Optional
 # Check for required packages
 try:
     import vertexai
-    from vertexai import Client
+    from vertexai import Client, types
     from vertexai.evaluation import EvalTask
     VERTEX_AVAILABLE = True
 except ImportError:
@@ -138,7 +138,6 @@ class VertexEvaluator:
                 "count": count,
                 "generation_instruction": generation_instruction,
             },
-            allow_cross_region_model=True,
         )
 
         # Save generated scenarios
@@ -220,22 +219,25 @@ class VertexEvaluator:
             metrics: List of metrics to compute
         """
         if metrics is None:
+            # Use real RubricMetric enum objects, not strings. (INSTRUCTION_ADHERENCE
+            # and a bare RESPONSE_QUALITY are not valid metric names; the agent
+            # response-quality rater is FINAL_RESPONSE_QUALITY.)
             metrics = [
                 # Multi-turn metrics
-                "MULTI_TURN_TASK_SUCCESS",
-                "MULTI_TURN_TOOL_USE_QUALITY",
-                # Response quality
-                "RESPONSE_QUALITY",
-                "INSTRUCTION_ADHERENCE",
-                # Safety
-                "SAFETY",
+                types.RubricMetric.MULTI_TURN_TASK_SUCCESS,
+                types.RubricMetric.MULTI_TURN_TOOL_USE_QUALITY,
+                types.RubricMetric.MULTI_TURN_TRAJECTORY_QUALITY,
+                # Single-turn response quality + safety
+                types.RubricMetric.FINAL_RESPONSE_QUALITY,
+                types.RubricMetric.SAFETY,
             ]
 
         print(f"Evaluating with metrics: {metrics}")
 
+        # Official SDK kwarg is `dataset=` (carries the traces), not `traces=`.
         eval_result = self.client.evals.evaluate(
-            traces=traces,
-            metrics=metrics
+            dataset=traces,
+            metrics=metrics,
         )
 
         # Save results
@@ -254,10 +256,13 @@ class VertexEvaluator:
         print("EVALUATION SUMMARY")
         print("=" * 60)
 
-        if "metrics" in eval_result:
-            for metric, value in eval_result["metrics"].items():
-                status = "PASS" if value >= 0.7 else "FAIL"
-                print(f"  {metric}: {value:.3f} [{status}]")
+        # The SDK exposes aggregate scores via `summary_metrics`, not a "metrics" key.
+        summary = getattr(eval_result, "summary_metrics", None)
+        if summary:
+            for metric, value in summary.items():
+                score = value.get("mean", 0) if isinstance(value, dict) else value
+                status = "PASS" if score >= 0.7 else "FAIL"
+                print(f"  {metric}: {score:.3f} [{status}]")
 
     async def analyze_failures(self, eval_result: dict) -> dict:
         """
@@ -312,7 +317,7 @@ class VertexEvaluator:
 
         print(f"Optimizing: {targets}")
 
-        optimize_result = self.client.optimizer.optimize(
+        optimize_result = self.client.prompt_optimizer.optimize(
             targets=targets,
             benchmark=eval_result,
             tests=eval_dataset

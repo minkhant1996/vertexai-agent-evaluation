@@ -421,7 +421,7 @@ All endpoints may return these error formats:
 { "useADK": true }
 ```
 - Uses `google-cloud-aiplatform[adk]`
-- GEPA algorithm
+- LLM-assisted instruction rewriting (ADK `SimplePromptOptimizer` scaffold; Gemini today)
 - Better quality, slower
 
 ### Quality Flywheel
@@ -432,7 +432,7 @@ All endpoints may return these error formats:
 - Scenario generation
 - Multi-turn AutoRaters
 - Loss cluster analysis
-- GEPA optimization
+- LLM-assisted instruction optimization
 - Highest quality, slowest
 
 ---

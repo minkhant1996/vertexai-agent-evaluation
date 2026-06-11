@@ -19,7 +19,12 @@ Implemented Google's 5-step agent optimization workflow:
 | Run Inference | Agent execution with traces | `scripts/vertex_evaluation.py` |
 | Compute Metrics | Multi-turn AutoRaters | `scripts/vertex_evaluation.py` |
 | Loss Clusters | Auto-Loss Analysis | `scripts/vertex_evaluation.py` |
-| Optimize (GEPA) | Genetic Evolution Prompt Algorithm | `scripts/vertex_evaluation.py` |
+| Optimize | LLM-assisted instruction rewriting (GEPA scaffold; Gemini today) | `scripts/vertex_evaluation.py` |
+
+> **Status:** The table describes the *intended* Agent Platform flow. Today the running path
+> produces metrics/loss-clusters/optimization via a Gemini prompt; the real
+> `client.evals.evaluate` path is available through `eval/real_eval.py`. See
+> [docs/GENAI_EVALUATION_SERVICE.md § Implementation status](./docs/GENAI_EVALUATION_SERVICE.md#implementation-status-in-this-project).
 
 ### 2. Real A/B Testing
 Replaced mock A/B testing with actual Gemini-based evaluation:
@@ -65,7 +70,7 @@ async runQualityFlywheel(
 3. Runs inference with user simulation
 4. Computes metrics (MULTI_TURN_TASK_SUCCESS, etc.)
 5. Generates loss clusters for failure analysis
-6. Applies GEPA optimization
+6. Applies LLM-assisted instruction optimization
 7. Returns optimized instruction + evaluation data
 
 **Input:**

@@ -193,7 +193,7 @@ User Input
 |-------|------------|---------|
 | Frontend | React + Vite + Tailwind | User interface |
 | Backend | TypeScript + ADK | Agent orchestration |
-| AI Model | Gemini 2.0 Flash | Reasoning & tool calling |
+| AI Model | Gemini 2.5 Flash (Vertex AI) | Reasoning & tool calling |
 | Tools | MCP-style FunctionTools | Domain-specific actions |
 | Database | PostgreSQL + Prisma | Data persistence |
 | Observability | Custom tracing | Monitoring & debugging |
