@@ -32,6 +32,12 @@ Built on proven frameworks (Truth Questions, Lean Startup, Design Thinking).
 
 ## Architecture
 
+### Agent Architecture
+
+![SoeMind Foundry - Agent Architecture](docs/agent-architecture.png)
+
+### System Architecture
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         FRONTEND (React)                            │
@@ -486,6 +492,10 @@ During optimization, the agent became more useful when its output was evaluated 
 - Whether the next action is **realistic**
 
 This helped move the agent from broad coaching advice toward **evidence-based founder action**.
+
+### Optimizer Challenge
+
+The optimizer generates instruction improvements based on failure patterns, but in testing, improved versions sometimes scored lower than the original. This reveals a key challenge: **optimizing for specific failure cases can degrade overall performance**. Future work would focus on regression testing — ensuring fixes don't break existing passing scenarios.
 
 ### Most Useful Vertex AI Feature
 
