@@ -6,9 +6,9 @@ import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { cn } from '../../lib/utils';
+import { getAuthHeaders } from '../../lib/api';
 
-// Use relative URL when not in development (same-origin)
-const BACKEND_URL = import.meta.env.VITE_API_URL || '';
+import { API_URL as BACKEND_URL } from '../../config'
 
 export function TemplateEditor() {
   const [templates, setTemplates] = useState([]);
@@ -44,7 +44,7 @@ export function TemplateEditor() {
 
   const fetchTemplates = async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/agent-templates`);
+      const res = await fetch(`${BACKEND_URL}/api/agent-templates`, { headers: getAuthHeaders() });
       const data = await res.json();
       setTemplates(data);
       if (data.length > 0 && !selectedTemplate) {
@@ -57,7 +57,7 @@ export function TemplateEditor() {
 
   const fetchHistory = async (templateId) => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/agent-templates/${templateId}/history`);
+      const res = await fetch(`${BACKEND_URL}/api/agent-templates/${templateId}/history`, { headers: getAuthHeaders() });
       const data = await res.json();
       setHistory(data || []);
     } catch (err) {
@@ -68,7 +68,7 @@ export function TemplateEditor() {
 
   const fetchDefaultTemplate = async (templateId) => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/agent-templates/${templateId}/default`);
+      const res = await fetch(`${BACKEND_URL}/api/agent-templates/${templateId}/default`, { headers: getAuthHeaders() });
       const data = await res.json();
       setDefaultTemplate(data);
     } catch (err) {
@@ -81,7 +81,7 @@ export function TemplateEditor() {
     try {
       const res = await fetch(`${BACKEND_URL}/api/agent-templates/preview`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ agentId: selectedTemplate?.id, template: instruction, variables: vars }),
       });
       const data = await res.json();
@@ -114,7 +114,7 @@ export function TemplateEditor() {
     try {
       const res = await fetch(`${BACKEND_URL}/api/agent-templates/${selectedTemplate.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           ...selectedTemplate,
           instruction: editedInstruction,
@@ -139,6 +139,7 @@ export function TemplateEditor() {
     try {
       const res = await fetch(`${BACKEND_URL}/api/agent-templates/${selectedTemplate.id}/reset`, {
         method: 'POST',
+        headers: getAuthHeaders(),
       });
       const data = await res.json();
       if (data.success) {
@@ -157,7 +158,7 @@ export function TemplateEditor() {
     if (!confirm('Reset ALL templates to defaults? Current versions will be saved to history.')) return;
 
     try {
-      await fetch(`${BACKEND_URL}/api/agent-templates/reset`, { method: 'POST' });
+      await fetch(`${BACKEND_URL}/api/agent-templates/reset`, { method: 'POST', headers: getAuthHeaders() });
       await fetchTemplates();
       if (selectedTemplate) {
         fetchHistory(selectedTemplate.id);
@@ -173,7 +174,7 @@ export function TemplateEditor() {
     try {
       const res = await fetch(`${BACKEND_URL}/api/agent-templates/history/apply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ historyId: historyEntry.id }),
       });
       const data = await res.json();

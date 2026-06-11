@@ -48,10 +48,52 @@ export interface SimulationEvent {
 
 type EventCallback = (event: SimulationEvent) => void;
 
-const AGENT_ENDPOINT = process.env.AGENT_ENDPOINT || 'http://localhost:8000';
+// Use correct port: API_PORT for production (Cloud Run), 3001 for local dev
+const API_PORT = process.env.API_PORT || '3001';
+const AGENT_ENDPOINT = process.env.AGENT_ENDPOINT || `http://localhost:${API_PORT}`;
 
-// Internal auth credentials for server-to-server calls
-const INTERNAL_AUTH = Buffer.from('demo:track2demo').toString('base64');
+// Auth credentials from environment
+const AUTH_USERNAME = process.env.AUTH_USERNAME || 'admin';
+const AUTH_PASSWORD = process.env.AUTH_PASSWORD || 'changeme';
+
+// Cached JWT token for internal server-to-server calls
+let cachedToken: string | null = null;
+let tokenExpiry: number = 0;
+
+/**
+ * Get a valid JWT token for internal API calls
+ */
+async function getInternalAuthToken(): Promise<string> {
+  const now = Date.now();
+
+  // Return cached token if still valid (with 1 hour buffer)
+  if (cachedToken && tokenExpiry > now + 3600000) {
+    return cachedToken as string;
+  }
+
+  try {
+    const res = await fetch(`${AGENT_ENDPOINT}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: AUTH_USERNAME, password: AUTH_PASSWORD }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      cachedToken = data.token;
+      // Token expires in 24h, cache for 23h
+      tokenExpiry = now + 23 * 3600000;
+      console.log('[SIM] Got internal auth token');
+      return data.token as string;
+    } else {
+      console.error('[SIM] Failed to get auth token:', res.status);
+      return '';
+    }
+  } catch (err) {
+    console.error('[SIM] Auth token error:', err);
+    return '';
+  }
+}
 
 /**
  * Run a single scenario with streaming events
@@ -310,6 +352,13 @@ async function runScenarioWithStreaming(
 
   await saveSimulationResult(result);
 
+  // Build conversation turns for persistence
+  const conversationTurns = allPrompts.map((prompt, i) => ({
+    turnNumber: i + 1,
+    userMessage: prompt,
+    agentResponse: allResponses[i] || '',
+  }));
+
   // Record trace with detailed pass/fail information and 5 metrics
   const trace = {
     traceId: `trace_${Date.now()}_${scenario.id}`,
@@ -317,7 +366,9 @@ async function runScenarioWithStreaming(
     scenarioId: scenario.id,
     scenarioName: scenario.name,
     userMessage: allPrompts[0], // Initial prompt
-    agentResponse: combinedResponse.substring(0, 500), // Truncate for storage
+    agentResponse: combinedResponse.substring(0, 500), // Truncate for summary
+    // Full conversation for replay
+    conversation: conversationTurns,
     latencyMs: totalLatencyMs,
     success: passed,
     score: evaluation.score,
@@ -368,12 +419,15 @@ async function runScenarioWithStreaming(
  */
 async function createSession(sessionId: string): Promise<string> {
   try {
-    console.log(`[SIM] Creating session at ${AGENT_ENDPOINT}/apps/src/users/simulator/sessions`);
-    const res = await fetch(`${AGENT_ENDPOINT}/apps/src/users/simulator/sessions`, {
+    const token = await getInternalAuthToken();
+    // URL format: /apps/:appName/users/:userId/sessions/:sessionId
+    const url = `${AGENT_ENDPOINT}/apps/src/users/simulator/sessions/${sessionId}`;
+    console.log(`[SIM] Creating session at ${url}`);
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Basic ${INTERNAL_AUTH}`,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({}),
     });
@@ -396,12 +450,13 @@ async function sendMessageWithStreaming(
   onChunk: (chunk: string) => void
 ): Promise<{ response: string; toolsCalled: string[] }> {
   try {
+    const token = await getInternalAuthToken();
     console.log(`[SIM] Sending to ${AGENT_ENDPOINT}/run_sse with session ${sessionId}`);
     const res = await fetch(`${AGENT_ENDPOINT}/run_sse`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Basic ${INTERNAL_AUTH}`,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
         appName: 'src',

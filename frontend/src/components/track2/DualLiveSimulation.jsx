@@ -17,8 +17,9 @@ import {
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { cn } from '../../lib/utils'
+import { getAuthHeaders } from '../../lib/api'
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || ''
+import { API_URL as BACKEND_URL } from '../../config'
 
 /**
  * Dual Live Simulation Component
@@ -77,7 +78,7 @@ export function DualLiveSimulation({ scenarios, onComplete }) {
     try {
       const response = await fetch(`${BACKEND_URL}/api/simulation/run-stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ scenarioId: scenario.id }),
       })
 

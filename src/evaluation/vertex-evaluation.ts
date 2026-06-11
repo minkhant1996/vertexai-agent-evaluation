@@ -63,7 +63,7 @@ export class VertexEvaluationClient {
   }) {
     this.projectId = options?.projectId || process.env.GOOGLE_CLOUD_PROJECT || '';
     this.location = options?.location || process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-    this.model = options?.model || 'gemini-2.5-flash-preview-05-20';
+    this.model = options?.model || 'gemini-2.5-flash';
 
     this.vertexAI = new VertexAI({
       project: this.projectId,
@@ -96,7 +96,7 @@ export class VertexEvaluationClient {
         generationConfig: {
           temperature: 0.1,
           topP: 0.8,
-          maxOutputTokens: 2000,
+          maxOutputTokens: 8192,
         },
       });
 

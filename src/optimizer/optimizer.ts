@@ -8,11 +8,20 @@
  */
 
 import { VertexAI } from '@google-cloud/vertexai';
+import { GoogleGenAI } from '@google/genai';
 import { EDGE_CASE_SCENARIOS } from '../simulation/edge-cases.js';
 import { AgentSimulator } from '../simulation/simulator.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
+
+// Thinking levels for Gemini 3.x models
+enum ThinkingLevel {
+  MINIMAL = 'MINIMAL',
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+}
 
 const execAsync = promisify(exec);
 
@@ -111,16 +120,51 @@ export class AgentOptimizer {
   private projectId: string;
   private location: string;
   private vertexAI: VertexAI;
+  private genAI: GoogleGenAI | null = null;
   private model: string;
 
   constructor(projectId?: string, location?: string) {
     this.projectId = projectId || process.env.GOOGLE_CLOUD_PROJECT || '';
     this.location = location || process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-    this.model = 'gemini-2.5-flash-preview-05-20';
+    this.model = 'gemini-3.1-pro-preview'; // Highest quality for fix generation
     this.vertexAI = new VertexAI({
       project: this.projectId,
       location: this.location,
     });
+    // Initialize new Google Gen AI SDK if API key is available
+    if (process.env.GEMINI_API_KEY) {
+      this.genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    }
+  }
+
+  /**
+   * Generate content using the new Google Gen AI SDK with thinking config
+   */
+  private async generateWithGenAI(prompt: string, maxTokens: number = 8192): Promise<string | null> {
+    if (!this.genAI) return null;
+
+    try {
+      const response = await this.genAI.models.generateContent({
+        model: this.model,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM },
+          maxOutputTokens: maxTokens,
+        },
+      });
+
+      // Get text from response
+      let text = '';
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.text) text += part.text;
+        }
+      }
+      return text || null;
+    } catch (error) {
+      console.error(`[GenAI] Error: ${error}`);
+      return null;
+    }
   }
 
   /**
@@ -271,11 +315,7 @@ export class AgentOptimizer {
         'Review agent response patterns for this scenario type and add specific handling.',
     };
 
-    try {
-      // Use Vertex AI Gemini to generate context-aware suggestions
-      const model = this.vertexAI.getGenerativeModel({ model: this.model });
-
-      const prompt = `You are an expert at optimizing AI agent instructions for founder validation agents.
+    const prompt = `You are an expert at optimizing AI agent instructions for founder validation agents.
 
 Given this failure pattern from simulation testing:
 - Pattern Type: ${pattern.pattern}
@@ -292,12 +332,28 @@ Generate a specific, actionable instruction fix that:
 
 Respond with ONLY the instruction text (no explanation, no markdown headers). Keep it under 200 words.`;
 
+    // Try new Google Gen AI SDK first (supports thinking config)
+    if (this.genAI) {
+      try {
+        const text = await this.generateWithGenAI(prompt, 2048);
+        if (text && text.length > 20) {
+          console.log(`  [GenAI] Generated fix for pattern: ${pattern.pattern}`);
+          return text.trim();
+        }
+      } catch (error) {
+        console.log(`  [GenAI] Error, trying Vertex AI: ${error}`);
+      }
+    }
+
+    // Fall back to Vertex AI
+    try {
+      const model = this.vertexAI.getGenerativeModel({ model: this.model });
       const result = await model.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.3,
           topP: 0.8,
-          maxOutputTokens: 500,
+          maxOutputTokens: 8192,
         },
       });
 
@@ -309,10 +365,9 @@ Respond with ONLY the instruction text (no explanation, no markdown headers). Ke
         return text.trim();
       }
 
-      // Fall back to static fix if response is too short
       return fallbackFixes[pattern.pattern] || fallbackFixes['other'];
     } catch (error) {
-      console.log(`  [Fallback] Using static fix for ${pattern.pattern} (Vertex AI error: ${error})`);
+      console.log(`  [Fallback] Using static fix for ${pattern.pattern} (error: ${error})`);
       return fallbackFixes[pattern.pattern] || fallbackFixes['other'];
     }
   }

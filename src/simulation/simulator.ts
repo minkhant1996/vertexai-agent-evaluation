@@ -449,7 +449,8 @@ export class AgentSimulator {
  * CLI runner for simulations
  */
 export async function runSimulationCLI(agentEndpoint?: string): Promise<void> {
-  const endpoint = agentEndpoint || process.env.AGENT_ENDPOINT || 'http://localhost:8101';
+  const apiPort = process.env.API_PORT || '3001';
+  const endpoint = agentEndpoint || process.env.AGENT_ENDPOINT || `http://localhost:${apiPort}`;
   const simulator = new AgentSimulator(endpoint);
 
   console.log('='.repeat(60));

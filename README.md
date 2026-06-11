@@ -1,8 +1,8 @@
-# SoeMind Foundry: Founder Validation Agent
+# SoeMind Foundry: Idea Validation Agent
 
 > **Google for Startups AI Agents Challenge - Track 2: Optimize**
 
-An AI-powered multi-agent system that helps startup founders validate their ideas before building. Built with Google's Agent Development Kit (ADK) and deployed on Google Cloud.
+An AI-powered multi-agent system that helps early-stage startup founders validate their ideas before building an MVP. Built with Google's Agent Development Kit (ADK) and deployed on Google Cloud.
 
 **Live Demo:** https://founder-validation-agent-356663565224.us-central1.run.app
 
@@ -10,17 +10,13 @@ An AI-powered multi-agent system that helps startup founders validate their idea
 
 ## Problem
 
-**90% of startups fail.** The #1 reason? Building something nobody wants.
-
-Founders often:
-- Skip customer validation ("I know what they need")
-- Build features before finding problems
-- Target "everyone" instead of specific segments
-- Confuse interest with commitment
+Early-stage founders often struggle to validate ideas clearly. In the existing SoeMind Foundry coaching workflow, AI could help founders clarify ideas, but the output needed to become more reliable across real founder scenarios — vague startup ideas, weak assumptions, unclear target users, incomplete evidence, and oversized MVP scopes.
 
 ## Solution
 
-A multi-agent orchestration system that guides founders through rigorous idea validation using proven frameworks (Mom Test, Lean Startup, Design Thinking).
+SoeMind Foundry: Idea Validation Agent optimizes the existing idea-clarification workflow into a structured validation agent for private-beta founders. The agent guides founders through a repeatable process: clarifying the idea, identifying risky assumptions, generating customer interview questions, narrowing MVP scope, and recommending a focused 7-day validation task.
+
+Built on proven frameworks (Truth Questions, Lean Startup, Design Thinking).
 
 ### What It Does
 
@@ -28,7 +24,7 @@ A multi-agent orchestration system that guides founders through rigorous idea va
 |------------|-------------|
 | **Clarify Ideas** | Transform vague ideas into structured problem/solution statements |
 | **Hunt Assumptions** | Identify risky assumptions that need testing first |
-| **Generate Questions** | Create customer interview questions (Mom Test style) |
+| **Generate Questions** | Create non-leading customer interview questions |
 | **Scope MVPs** | Define the smallest testable product |
 | **Create Plans** | Build 7-day validation plans with concrete actions |
 
@@ -104,7 +100,7 @@ A multi-agent orchestration system that guides founders through rigorous idea va
 | **Orchestrator** | Routes requests, synthesizes outputs | `detect_validation_stage`, `delegate_to_agent`, `synthesize_outputs` |
 | **Problem Clarifier** | Structures vague ideas | `clarify_idea` |
 | **Assumption Hunter** | Finds risky assumptions | `identify_risky_assumptions` |
-| **Customer Researcher** | Generates interview questions | `generate_interview_questions` |
+| **Customer Researcher** | Generates non-leading interview questions | `generate_interview_questions` |
 | **Experiment Designer** | Scopes MVPs & validation plans | `define_mvp_scope`, `create_7day_validation_plan` |
 
 ---
@@ -249,14 +245,23 @@ faithful to Google's [official quick-start notebook](docs/notebooks/quick_start_
 
 | Component | Technology |
 |-----------|------------|
-| **Agent Framework** | Google Agent Development Kit (ADK) — `@google/adk` (`LlmAgent`, `FunctionTool`, `GOOGLE_SEARCH`) |
+| **Agent Framework** | Google Agent Development Kit (ADK) — `@google/adk` (`LlmAgent`, `FunctionTool`) |
 | **LLM** | Gemini 2.5 Flash (Vertex AI) |
 | **Runtime** | Node.js 22 + TypeScript |
 | **Frontend** | React 18 + Vite + Tailwind CSS |
 | **Backend** | Express.js |
-| **Evaluation** | Vertex Gen AI Evaluation Service (`client.evals.evaluate`) + Python `google-cloud-aiplatform[evaluation]` |
+| **Storage** | Google Cloud Storage (JSON persistence) |
+| **Evaluation** | Vertex AI Evaluation API + Agent Platform simulation approach |
 | **Deployment** | Google Cloud Run |
 | **Protocol** | A2A (Agent-to-Agent) |
+
+### Data Sources
+
+- Founder profile data and startup idea descriptions
+- MVP scope and customer interview notes
+- Validation evidence and blocker logs
+- Synthetic founder scenarios for testing
+- Internal SoeMind Foundry coaching frameworks
 
 ---
 
@@ -461,12 +466,34 @@ See the `/docs` folder for detailed documentation:
 
 Built on proven methodologies:
 
-- **The Mom Test** (Rob Fitzpatrick) - Customer conversation rules
+- **Truth Questions** (Rob Fitzpatrick) - Customer conversation rules
 - **Lean Startup** (Eric Ries) - Leap-of-faith hypotheses
 - **Inspired** (Marty Cagan) - Opportunity assessment
 - **Lean Product Playbook** (Dan Olsen) - MVP scoping
 - **YC Startup Library** - The 6 core questions
 - **Google Quality Flywheel** - Agent evaluation & optimization
+
+---
+
+## Findings and Learnings
+
+The biggest learning is that founders do not only need AI answers — they need **structured decision support** that remains reliable across different startup contexts.
+
+During optimization, the agent became more useful when its output was evaluated against specific quality criteria:
+- Whether assumptions are **specific and testable**
+- Whether interview questions are **not leading**
+- Whether MVP scope is **small enough**
+- Whether the next action is **realistic**
+
+This helped move the agent from broad coaching advice toward **evidence-based founder action**.
+
+### Most Useful Vertex AI Feature
+
+**Vertex AI Evaluation API** — Automated pass/fail scoring on evaluation datasets. Instead of manually reviewing responses, we define pass criteria and let the API score each response on multiple dimensions: coherence, groundedness, safety, and task fulfillment.
+
+### What's Missing
+
+**Built-in evaluation callbacks that expose agent reasoning and tool selection rationale.** Currently, understanding *why* the agent chose a specific tool requires building a separate LLM analysis layer. Structured reasoning traces would make debugging instant instead of investigative.
 
 ---
 

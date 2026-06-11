@@ -325,7 +325,8 @@ const main = async () => {
       if (!evalSet) {
         return res.status(404).json({ error: 'Eval set not found' });
       }
-      res.json({ name: evalSetName, ...evalSet });
+      // Spread first, then override name to ensure correct value
+      res.json({ ...evalSet, name: evalSetName });
     });
 
     // Eval results (mock for now)

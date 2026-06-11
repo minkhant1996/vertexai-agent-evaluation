@@ -6,9 +6,9 @@ import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { cn } from '../../lib/utils';
+import { getAuthHeaders } from '../../lib/api';
 
-// Use relative URL when not in development (same-origin)
-const BACKEND_URL = import.meta.env.VITE_API_URL || '';
+import { API_URL as BACKEND_URL } from '../../config'
 
 export function AgentTemplateEditor() {
   const [templates, setTemplates] = useState([]);
@@ -37,7 +37,7 @@ export function AgentTemplateEditor() {
 
   const fetchTemplates = async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/agent-templates`);
+      const res = await fetch(`${BACKEND_URL}/api/agent-templates`, { headers: getAuthHeaders() });
       const data = await res.json();
       setTemplates(data);
       if (data.length > 0 && !selectedTemplate) {
@@ -52,7 +52,7 @@ export function AgentTemplateEditor() {
     try {
       const res = await fetch(`${BACKEND_URL}/api/agent-templates/preview`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           agentId: selectedTemplate.id,
           variables
@@ -80,17 +80,25 @@ export function AgentTemplateEditor() {
     if (!selectedTemplate) return;
     setSaving(true);
     try {
+      // Update variables array with current values as defaultValue
+      const updatedVariables = (selectedTemplate.variables || []).map(v => ({
+        ...v,
+        defaultValue: variables[v.name] !== undefined ? variables[v.name] : v.defaultValue,
+      }));
+
       const res = await fetch(`${BACKEND_URL}/api/agent-templates/${selectedTemplate.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           ...selectedTemplate,
           instruction: editedInstruction,
+          variables: updatedVariables, // Include updated variable values
         }),
       });
       const updated = await res.json();
       setSelectedTemplate(updated);
       setTemplates(prev => prev.map(t => t.id === updated.id ? updated : t));
+      console.log('[Template] Saved with variables:', updatedVariables.map(v => `${v.name}=${v.defaultValue?.substring(0,30)}...`));
     } catch (err) {
       console.error('Failed to save template:', err);
     }
@@ -99,7 +107,7 @@ export function AgentTemplateEditor() {
 
   const resetTemplates = async () => {
     try {
-      await fetch(`${BACKEND_URL}/api/agent-templates/reset`, { method: 'POST' });
+      await fetch(`${BACKEND_URL}/api/agent-templates/reset`, { method: 'POST', headers: getAuthHeaders() });
       await fetchTemplates();
     } catch (err) {
       console.error('Failed to reset templates:', err);
@@ -111,7 +119,7 @@ export function AgentTemplateEditor() {
       return;
     }
     try {
-      const res = await fetch(`${BACKEND_URL}/api/agent-templates/${templateId}/reset`, { method: 'POST' });
+      const res = await fetch(`${BACKEND_URL}/api/agent-templates/${templateId}/reset`, { method: 'POST', headers: getAuthHeaders() });
       const updated = await res.json();
       if (updated.success !== false) {
         setSelectedTemplate(updated.template || updated);

@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react'
-import { Zap, TrendingUp, GitCompare, AlertTriangle, FileCode, Check, ArrowRight, X, Eye } from 'lucide-react'
+import { Zap, TrendingUp, GitCompare, AlertTriangle, FileCode, Check, ArrowRight, X, Eye, RefreshCw, Play } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { StatCard } from '../ui/stat-card'
 import { cn } from '../../lib/utils'
+import { getAuthHeaders } from '../../lib/api'
+import { LiveABTest } from './LiveABTest'
 
-// Use relative URL when not in development (same-origin)
-const BACKEND_URL = import.meta.env.VITE_API_URL || ''
+import { API_URL as BACKEND_URL } from '../../config'
 
 export function OptimizerDashboard() {
   const [patterns, setPatterns] = useState([])
@@ -23,6 +24,8 @@ export function OptimizerDashboard() {
   const [selectedVersionB, setSelectedVersionB] = useState(null)
   const [useADK, setUseADK] = useState(false) // Use Google ADK optimizer
   const [useQualityFlywheel, setUseQualityFlywheel] = useState(false) // Use full Quality Flywheel
+  const [loadingPatterns, setLoadingPatterns] = useState(true) // Loading state for patterns
+  const [liveABTest, setLiveABTest] = useState(null) // { versionA, versionB } for live test
 
   useEffect(() => {
     fetchPatterns()
@@ -30,19 +33,25 @@ export function OptimizerDashboard() {
     fetchAgents()
   }, [])
 
-  const fetchPatterns = async () => {
+  const fetchPatterns = async (forceRefresh = false) => {
+    setLoadingPatterns(true)
     try {
-      const res = await fetch(`${BACKEND_URL}/api/optimizer/analyze-failures`)
+      // Force refresh clears the cache first
+      if (forceRefresh) {
+        await fetch(`${BACKEND_URL}/api/optimizer/analyze-failures/refresh`, { method: 'POST', headers: getAuthHeaders() })
+      }
+      const res = await fetch(`${BACKEND_URL}/api/optimizer/analyze-failures`, { headers: getAuthHeaders() })
       const data = await res.json()
       setPatterns(data)
     } catch (err) {
       setPatterns(MOCK_PATTERNS)
     }
+    setLoadingPatterns(false)
   }
 
   const fetchVersions = async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/optimizer/history`)
+      const res = await fetch(`${BACKEND_URL}/api/optimizer/history`, { headers: getAuthHeaders() })
       const data = await res.json()
       setVersions(data)
     } catch (err) {
@@ -52,7 +61,7 @@ export function OptimizerDashboard() {
 
   const fetchAgents = async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/optimizer/agents`)
+      const res = await fetch(`${BACKEND_URL}/api/optimizer/agents`, { headers: getAuthHeaders() })
       const data = await res.json()
       setAvailableAgents(data)
     } catch (err) {
@@ -78,7 +87,7 @@ export function OptimizerDashboard() {
 
       await fetch(`${BACKEND_URL}/api/optimizer/optimize`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(body),
       })
       await fetchVersions()
@@ -115,7 +124,7 @@ export function OptimizerDashboard() {
 
       const res = await fetch(`${BACKEND_URL}/api/optimizer/optimize-all`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(body),
       })
       const data = await res.json()
@@ -138,7 +147,7 @@ export function OptimizerDashboard() {
     try {
       const res = await fetch(`${BACKEND_URL}/api/optimizer/apply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ versionId }),
       })
       const data = await res.json()
@@ -191,8 +200,7 @@ export function OptimizerDashboard() {
 
       const res = await fetch(`${BACKEND_URL}/api/optimizer/ab-test`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           versionA: selectedVersionA,
           versionB: selectedVersionB,
@@ -222,7 +230,7 @@ export function OptimizerDashboard() {
   const activeVersion = versions.find(v => v.isActive)
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 h-full overflow-y-auto">
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
@@ -273,18 +281,18 @@ export function OptimizerDashboard() {
           </Button>
           <Button
             onClick={() => runOptimizationAllAgents()}
-            disabled={optimizing || patterns.length === 0}
+            disabled={optimizing || loadingPatterns || patterns.length === 0}
           >
             <Zap className="w-4 h-4" />
-            {optimizing ? 'Optimizing...' : `Fix All (${patterns.length})`}
+            {optimizing ? 'Optimizing...' : loadingPatterns ? 'Loading...' : `Fix All (${patterns.length})`}
           </Button>
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-4 gap-4">
-        <StatCard label="Failure Patterns" value={patterns.length} icon={AlertTriangle} variant="error" />
-        <StatCard label="Total Failures" value={totalFailures} variant="warning" />
+        <StatCard label="Failure Patterns" value={loadingPatterns ? '...' : patterns.length} icon={AlertTriangle} variant="error" />
+        <StatCard label="Total Failures" value={loadingPatterns ? '...' : totalFailures} variant="warning" />
         <StatCard label="Instruction Versions" value={versions.length} icon={FileCode} />
         <StatCard label="Active Version" value={`v${activeVersion?.version || 1}`} variant="success" />
       </div>
@@ -428,16 +436,39 @@ export function OptimizerDashboard() {
         {/* Failure Patterns */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-400" />
-              Detected Failure Patterns
-            </CardTitle>
-            <CardDescription>
-              Global patterns from all simulation runs. Fixes will be applied to: <span className="text-violet-400 font-medium">{availableAgents.find(a => a.id === targetAgent)?.name || targetAgent}</span>
-            </CardDescription>
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                  Detected Failure Patterns
+                </CardTitle>
+                <CardDescription>
+                  Global patterns from all simulation runs. Fixes will be applied to: <span className="text-violet-400 font-medium">{availableAgents.find(a => a.id === targetAgent)?.name || targetAgent}</span>
+                </CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => fetchPatterns(true)}
+                disabled={loadingPatterns}
+                title="Re-analyze patterns"
+              >
+                <RefreshCw className={cn("w-4 h-4", loadingPatterns && "animate-spin")} />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            {patterns.length === 0 ? (
+            {loadingPatterns ? (
+              <div className="text-center py-8">
+                <div className="inline-flex items-center gap-3 text-slate-400">
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Analyzing failure patterns...</span>
+                </div>
+              </div>
+            ) : patterns.length === 0 ? (
               <div className="text-center py-8 text-slate-500">No failures detected. Run simulations first.</div>
             ) : (
               <div className="space-y-3 max-h-[400px] overflow-y-auto">
@@ -723,9 +754,34 @@ export function OptimizerDashboard() {
                 <GitCompare className="w-4 h-4 mr-2" />
                 Run A/B Test
               </Button>
+              <Button
+                variant="default"
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => {
+                  const vA = versions.find(v => v.version === selectedVersionA)
+                  const vB = versions.find(v => v.version === selectedVersionB)
+                  if (vA && vB) {
+                    setLiveABTest({ versionA: vA, versionB: vB })
+                    setAbTestModal(false)
+                  }
+                }}
+                disabled={!selectedVersionA || !selectedVersionB || selectedVersionA === selectedVersionB}
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Live Test
+              </Button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Live A/B Test Modal */}
+      {liveABTest && (
+        <LiveABTest
+          versionA={liveABTest.versionA}
+          versionB={liveABTest.versionB}
+          onClose={() => setLiveABTest(null)}
+        />
       )}
     </div>
   )

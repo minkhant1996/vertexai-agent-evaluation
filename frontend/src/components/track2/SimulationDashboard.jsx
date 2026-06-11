@@ -25,10 +25,11 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui
 import { Badge } from '../ui/badge'
 import { StatCard } from '../ui/stat-card'
 import { cn } from '../../lib/utils'
+import { getAuthHeaders } from '../../lib/api'
 import { DualLiveSimulation } from './DualLiveSimulation'
 
-// Use relative URL when not in development (same-origin)
-const BACKEND_URL = import.meta.env.VITE_API_URL || ''
+// Use API_URL from config (handles local vs production)
+import { API_URL as BACKEND_URL } from '../../config'
 
 export function SimulationDashboard() {
   const [scenarios, setScenarios] = useState([])
@@ -60,6 +61,8 @@ export function SimulationDashboard() {
   const [liveToolCalls, setLiveToolCalls] = useState([])
   const [currentScenarioData, setCurrentScenarioData] = useState(null)
   const [criteriaResults, setCriteriaResults] = useState([])
+  const [savedConversation, setSavedConversation] = useState(null)
+  const [loadingConversation, setLoadingConversation] = useState(false)
 
   const chatEndRef = useRef(null)
   const abortControllerRef = useRef(null)
@@ -75,7 +78,9 @@ export function SimulationDashboard() {
 
   const fetchScenarios = async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/simulation/scenarios`)
+      const res = await fetch(`${BACKEND_URL}/api/simulation/scenarios`, {
+        headers: getAuthHeaders()
+      })
       const data = await res.json()
       setScenarios(data)
     } catch (err) {
@@ -83,10 +88,60 @@ export function SimulationDashboard() {
     }
   }
 
+  // Load saved conversation for a scenario
+  const fetchSavedConversation = async (scenarioId) => {
+    setLoadingConversation(true)
+    setSavedConversation(null)
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/simulation/conversation/${scenarioId}`, {
+        headers: getAuthHeaders()
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setSavedConversation(data)
+        // Convert to liveConversation format for display
+        const messages = []
+        messages.push({
+          type: 'system',
+          content: `Previous run: ${data.scenarioName}`,
+          timestamp: new Date(data.createdAt).getTime(),
+        })
+        for (const turn of data.conversation) {
+          messages.push({
+            type: 'user',
+            content: turn.userMessage,
+            turnNumber: turn.turnNumber,
+            timestamp: Date.now(),
+          })
+          messages.push({
+            type: 'agent',
+            content: turn.agentResponse,
+            turnNumber: turn.turnNumber,
+            timestamp: Date.now(),
+          })
+        }
+        // Add final result
+        messages.push({
+          type: 'final_result',
+          passed: data.success,
+          score: data.score,
+          timestamp: Date.now(),
+        })
+        setLiveConversation(messages)
+        setLiveMode(true)
+      }
+    } catch (err) {
+      console.error('Failed to fetch conversation:', err)
+    }
+    setLoadingConversation(false)
+  }
+
   // Load previous results
   const fetchPreviousResults = async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/simulation/history`)
+      const res = await fetch(`${BACKEND_URL}/api/simulation/history`, {
+        headers: getAuthHeaders()
+      })
       const history = await res.json()
       if (history && history.length > 0) {
         // Group by scenarioId, keep latest result for each
@@ -123,6 +178,7 @@ export function SimulationDashboard() {
     setStreamingText('')
     setAgentThinking(false)
     setLiveToolCalls([])
+    setSavedConversation(null) // Clear saved conversation
 
     const scenario = scenarios.find(s => s.id === scenarioId)
     if (scenario) {
@@ -136,7 +192,7 @@ export function SimulationDashboard() {
     try {
       const response = await fetch(`${BACKEND_URL}/api/simulation/run-stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ scenarioId }),
       })
 
@@ -176,6 +232,7 @@ export function SimulationDashboard() {
     setAgentThinking(false)
     setLiveToolCalls([])
     setResults({})
+    setSavedConversation(null) // Clear saved conversation
 
     setLiveConversation([{
       type: 'system',
@@ -186,7 +243,7 @@ export function SimulationDashboard() {
     try {
       const response = await fetch(`${BACKEND_URL}/api/simulation/run-all-stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       })
 
       const reader = response.body.getReader()
@@ -364,9 +421,17 @@ export function SimulationDashboard() {
     }
   }
 
-  const passedCount = Object.values(results).filter(r => r.passed).length
-  const totalRun = Object.keys(results).length
-  const passRate = totalRun > 0 ? (passedCount / totalRun * 100) : 0
+  // Calculate stats from results (completed scenarios)
+  const completedPassedCount = Object.values(results).filter(r => r.passed).length
+  const completedTotalRun = Object.keys(results).length
+  const completedPassRate = completedTotalRun > 0 ? (completedPassedCount / completedTotalRun * 100) : 0
+
+  // Use liveMetrics during batch simulation for real-time updates
+  const isInBatchMode = running && liveMetrics.totalScenarios > 0
+  const passedCount = isInBatchMode ? liveMetrics.passedCount : completedPassedCount
+  const failedCount = isInBatchMode ? liveMetrics.failedCount : (completedTotalRun - completedPassedCount)
+  const totalRun = isInBatchMode ? liveMetrics.currentScenario : completedTotalRun
+  const passRate = isInBatchMode ? liveMetrics.passRate : completedPassRate
 
   const getDifficultyVariant = (difficulty) => {
     switch (difficulty) {
@@ -417,7 +482,7 @@ export function SimulationDashboard() {
           </div>
           <div className="flex items-center gap-4 text-sm">
             <span className="text-emerald-400">{passedCount} passed</span>
-            <span className="text-rose-400">{totalRun - passedCount} failed</span>
+            <span className="text-rose-400">{failedCount} failed</span>
             <span className={cn(
               "font-semibold",
               passRate >= 80 ? "text-emerald-400" : "text-amber-400"
@@ -496,8 +561,14 @@ export function SimulationDashboard() {
                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => {
                     if (!running) {
                       setSelectedScenario(scenario)
-                      setLiveMode(false) // Clear live mode to show preview
-                      setLiveConversation([]) // Clear previous conversation
+                      // If scenario has results, try to load saved conversation
+                      if (results[scenario.id]) {
+                        fetchSavedConversation(scenario.id)
+                      } else {
+                        setLiveMode(false) // Clear live mode to show preview
+                        setLiveConversation([]) // Clear previous conversation
+                        setSavedConversation(null)
+                      }
                     }
                   }}>
                     <div className="font-medium text-slate-200 text-sm truncate">{scenario.name}</div>
@@ -514,16 +585,27 @@ export function SimulationDashboard() {
                     </Badge>
                     {isActive && running ? (
                       <RefreshCw className="w-4 h-4 text-indigo-400 animate-spin" />
-                    ) : result ? (
-                      <div className="flex items-center gap-1">
-                        {result.passed ? (
-                          <CheckCircle className="w-4 h-4 text-emerald-400" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-rose-400" />
-                        )}
-                      </div>
                     ) : (
-                      <Play className="w-3 h-3 text-slate-500" />
+                      <>
+                        {result && (
+                          result.passed ? (
+                            <CheckCircle className="w-4 h-4 text-emerald-400" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-rose-400" />
+                          )
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!running) runSingleScenario(scenario.id)
+                          }}
+                          disabled={running}
+                          className="p-1 rounded hover:bg-slate-700 transition-colors disabled:opacity-50"
+                          title="Run this scenario"
+                        >
+                          <Play className="w-4 h-4 text-indigo-400" />
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -540,10 +622,15 @@ export function SimulationDashboard() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
-                <Activity className={cn("w-4 h-4", running ? "text-emerald-400 animate-pulse" : "text-slate-500")} />
+                <Activity className={cn("w-4 h-4", running ? "text-emerald-400 animate-pulse" : savedConversation ? "text-blue-400" : "text-slate-500")} />
                 <span className="text-sm text-slate-300">
-                  {running ? 'Live' : 'Ready'}
+                  {running ? 'Live' : savedConversation ? 'Replay' : 'Ready'}
                 </span>
+                {savedConversation && !running && (
+                  <Badge variant="secondary" className="text-xs bg-blue-500/20 text-blue-300">
+                    Saved
+                  </Badge>
+                )}
               </div>
               {liveMetrics.totalScenarios > 0 && (
                 <div className="text-sm text-slate-400">
@@ -563,7 +650,7 @@ export function SimulationDashboard() {
                 <span className="text-slate-500 text-sm">passed</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-rose-400 font-semibold">{totalRun - passedCount}</span>
+                <span className="text-rose-400 font-semibold">{failedCount}</span>
                 <span className="text-slate-500 text-sm">failed</span>
               </div>
               <div className="flex items-center gap-2">
@@ -581,7 +668,14 @@ export function SimulationDashboard() {
 
         {/* Conversation Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {!liveMode && !selectedScenario ? (
+          {loadingConversation ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <RefreshCw className="w-12 h-12 text-indigo-400 mx-auto mb-4 animate-spin" />
+                <h3 className="text-lg font-semibold text-slate-400">Loading conversation...</h3>
+              </div>
+            </div>
+          ) : !liveMode && !selectedScenario ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <FlaskConical className="w-16 h-16 text-slate-700 mx-auto mb-4" />

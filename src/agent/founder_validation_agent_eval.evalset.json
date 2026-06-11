@@ -1,0 +1,210 @@
+{
+  "evalSetId": "founder_validation_agent_eval",
+  "name": "Founder Validation Agent Test Suite",
+  "description": "Evaluates the agent's ability to help founders clarify ideas, identify assumptions, generate interview questions, scope MVPs, and create validation plans.",
+  "evalCases": [
+    {
+      "evalId": "clarify_vague_idea",
+      "conversation": [
+        {
+          "invocationId": "turn_1",
+          "userContent": {
+            "role": "user",
+            "parts": [{"text": "I want to build a tool that helps businesses manage their data better"}]
+          },
+          "intermediateData": {
+            "toolUses": [{"name": "clarify_idea", "args": {}}],
+            "toolResponses": []
+          },
+          "creationTimestamp": 1718150400
+        }
+      ],
+      "sessionInput": {"appName": "agent", "userId": "eval_user", "state": {}},
+      "creationTimestamp": 1718150400
+    },
+    {
+      "evalId": "clarify_with_clear_problem",
+      "conversation": [
+        {
+          "invocationId": "turn_1",
+          "userContent": {
+            "role": "user",
+            "parts": [{"text": "I noticed that freelance designers waste hours every week chasing invoices. Most of my designer friends say this is their biggest frustration. I want to build something to help them."}]
+          },
+          "intermediateData": {
+            "toolUses": [{"name": "clarify_idea", "args": {}}],
+            "toolResponses": []
+          },
+          "creationTimestamp": 1718150400
+        }
+      ],
+      "sessionInput": {"appName": "agent", "userId": "eval_user", "state": {}},
+      "creationTimestamp": 1718150400
+    },
+    {
+      "evalId": "challenge_feature_first",
+      "conversation": [
+        {
+          "invocationId": "turn_1",
+          "userContent": {
+            "role": "user",
+            "parts": [{"text": "I want to build an app with AI that analyzes documents and has a dashboard with charts and integrates with Slack and has team collaboration features"}]
+          },
+          "creationTimestamp": 1718150400
+        }
+      ],
+      "sessionInput": {"appName": "agent", "userId": "eval_user", "state": {}},
+      "creationTimestamp": 1718150400
+    },
+    {
+      "evalId": "identify_assumptions",
+      "conversation": [
+        {
+          "invocationId": "turn_1",
+          "userContent": {
+            "role": "user",
+            "parts": [{"text": "My clarified idea: A mobile app for pet owners to track their pet's health metrics. Target customer: dog owners aged 25-40. Core problem: Pet owners forget vet appointments and medication schedules."}]
+          },
+          "intermediateData": {
+            "toolUses": [{"name": "identify_risky_assumptions", "args": {}}],
+            "toolResponses": []
+          },
+          "creationTimestamp": 1718150400
+        }
+      ],
+      "sessionInput": {"appName": "agent", "userId": "eval_user", "state": {}},
+      "creationTimestamp": 1718150400
+    },
+    {
+      "evalId": "generate_interview_questions",
+      "conversation": [
+        {
+          "invocationId": "turn_1",
+          "userContent": {
+            "role": "user",
+            "parts": [{"text": "I need to interview solo freelance accountants about their client acquisition challenges. My riskiest assumption is that they struggle to find new clients. What questions should I ask?"}]
+          },
+          "intermediateData": {
+            "toolUses": [{"name": "generate_interview_questions", "args": {}}],
+            "toolResponses": []
+          },
+          "creationTimestamp": 1718150400
+        }
+      ],
+      "sessionInput": {"appName": "agent", "userId": "eval_user", "state": {}},
+      "creationTimestamp": 1718150400
+    },
+    {
+      "evalId": "analyze_weak_interview",
+      "conversation": [
+        {
+          "invocationId": "turn_1",
+          "userContent": {
+            "role": "user",
+            "parts": [{"text": "I did 5 interviews with restaurant owners about scheduling. 4 out of 5 said scheduling is annoying but not their top problem - they care more about food costs. Only 1 said they would pay for a scheduling tool. Most use paper or free apps."}]
+          },
+          "creationTimestamp": 1718150400
+        }
+      ],
+      "sessionInput": {"appName": "agent", "userId": "eval_user", "state": {}},
+      "creationTimestamp": 1718150400
+    },
+    {
+      "evalId": "scope_overbuilt_mvp",
+      "conversation": [
+        {
+          "invocationId": "turn_1",
+          "userContent": {
+            "role": "user",
+            "parts": [{"text": "For my invoicing tool for designers, I want to build: invoice creation, payment processing, client portal, expense tracking, tax reporting, and AI suggestions. Can you help me scope the MVP?"}]
+          },
+          "intermediateData": {
+            "toolUses": [{"name": "define_mvp_scope", "args": {}}],
+            "toolResponses": []
+          },
+          "creationTimestamp": 1718150400
+        }
+      ],
+      "sessionInput": {"appName": "agent", "userId": "eval_user", "state": {}},
+      "creationTimestamp": 1718150400
+    },
+    {
+      "evalId": "create_interview_plan",
+      "conversation": [
+        {
+          "invocationId": "turn_1",
+          "userContent": {
+            "role": "user",
+            "parts": [{"text": "I have a hypothesis about HR managers needing better onboarding tools. I haven't talked to any customers yet. Can you help me create a 7-day plan to validate this?"}]
+          },
+          "intermediateData": {
+            "toolUses": [{"name": "create_7day_validation_plan", "args": {}}],
+            "toolResponses": []
+          },
+          "creationTimestamp": 1718150400
+        }
+      ],
+      "sessionInput": {"appName": "agent", "userId": "eval_user", "state": {}},
+      "creationTimestamp": 1718150400
+    },
+    {
+      "evalId": "challenge_validation_seeker",
+      "conversation": [
+        {
+          "invocationId": "turn_1",
+          "userContent": {
+            "role": "user",
+            "parts": [{"text": "I've already decided to build a social network for left-handed people. I just need you to help me with the MVP. Don't try to change my mind."}]
+          },
+          "creationTimestamp": 1718150400
+        }
+      ],
+      "sessionInput": {"appName": "agent", "userId": "eval_user", "state": {}},
+      "creationTimestamp": 1718150400
+    },
+    {
+      "evalId": "multi_turn_full_flow",
+      "conversation": [
+        {
+          "invocationId": "turn_1",
+          "userContent": {
+            "role": "user",
+            "parts": [{"text": "I want to help small business owners with their bookkeeping"}]
+          },
+          "intermediateData": {
+            "toolUses": [{"name": "clarify_idea", "args": {}}],
+            "toolResponses": []
+          },
+          "creationTimestamp": 1718150400
+        },
+        {
+          "invocationId": "turn_2",
+          "userContent": {
+            "role": "user",
+            "parts": [{"text": "Target: Solo Etsy sellers doing $10-50k revenue. Problem: They spend 5+ hours per month on bookkeeping and often make mistakes."}]
+          },
+          "intermediateData": {
+            "toolUses": [{"name": "identify_risky_assumptions", "args": {}}],
+            "toolResponses": []
+          },
+          "creationTimestamp": 1718150401
+        },
+        {
+          "invocationId": "turn_3",
+          "userContent": {
+            "role": "user",
+            "parts": [{"text": "The riskiest assumption is that they would pay for this. What interview questions should I ask?"}]
+          },
+          "intermediateData": {
+            "toolUses": [{"name": "generate_interview_questions", "args": {}}],
+            "toolResponses": []
+          },
+          "creationTimestamp": 1718150402
+        }
+      ],
+      "sessionInput": {"appName": "agent", "userId": "eval_user", "state": {}},
+      "creationTimestamp": 1718150400
+    }
+  ],
+  "creationTimestamp": 1718150400
+}

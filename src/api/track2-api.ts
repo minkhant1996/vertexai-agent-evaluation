@@ -28,6 +28,10 @@ import { Storage } from '@google-cloud/storage';
 const BUCKET_NAME = process.env.STORAGE_BUCKET || 'founder-validation-data';
 const STORAGE_FILE = 'simulation-storage.json';
 
+// Use correct port for internal API calls (8080 on Cloud Run, 3001 locally)
+const API_PORT = process.env.API_PORT || '3001';
+const AGENT_ENDPOINT = process.env.AGENT_ENDPOINT || `http://localhost:${API_PORT}`;
+
 // Cloud Storage client
 const cloudStorage = new Storage();
 const bucket = cloudStorage.bucket(BUCKET_NAME);
@@ -36,6 +40,8 @@ const bucket = cloudStorage.bucket(BUCKET_NAME);
 const defaultStorage = {
   simulationRuns: [] as any[],
   traces: [] as any[],
+  // Cache for failure analysis (invalidated when runs change)
+  failureAnalysisCache: null as { patterns: any[]; runCount: number; lastAnalyzed: string } | null,
   instructionVersions: [
     {
       id: 'v1',
@@ -313,7 +319,7 @@ export async function handleTrack2Request(
     }
 
     const simulator = new AgentSimulator(
-      process.env.AGENT_ENDPOINT || 'http://localhost:8000'
+      AGENT_ENDPOINT
     );
 
     try {
@@ -339,7 +345,7 @@ export async function handleTrack2Request(
 
   if (path === '/api/simulation/run-all' && method === 'POST') {
     const simulator = new AgentSimulator(
-      process.env.AGENT_ENDPOINT || 'http://localhost:8101'
+      AGENT_ENDPOINT
     );
 
     const results = await simulator.runAllScenarios();
@@ -348,6 +354,31 @@ export async function handleTrack2Request(
 
   if (path === '/api/simulation/history' && method === 'GET') {
     return { status: 200, data: storage.simulationRuns.slice(-50) };
+  }
+
+  // Get conversation for a specific scenario (most recent)
+  if (path.startsWith('/api/simulation/conversation/') && method === 'GET') {
+    const scenarioId = path.split('/').pop();
+    // Find the most recent trace with conversation for this scenario
+    const trace = [...storage.traces]
+      .reverse()
+      .find((t: any) => t.scenarioId === scenarioId && t.conversation);
+
+    if (!trace || !trace.conversation) {
+      return { status: 404, data: { error: 'No conversation found for this scenario' } };
+    }
+
+    return {
+      status: 200,
+      data: {
+        scenarioId: trace.scenarioId,
+        scenarioName: trace.scenarioName,
+        conversation: trace.conversation,
+        score: trace.score,
+        success: trace.success,
+        createdAt: trace.createdAt,
+      },
+    };
   }
 
   // ========================================
@@ -455,7 +486,25 @@ export async function handleTrack2Request(
   // OPTIMIZER ROUTES
   // ========================================
 
+  // Force re-analyze (clear cache)
+  if (path === '/api/optimizer/analyze-failures/refresh' && method === 'POST') {
+    storage.failureAnalysisCache = null;
+    console.log(`[Optimizer] Cache cleared, will re-analyze on next request`);
+    return { status: 200, data: { success: true, message: 'Cache cleared' } };
+  }
+
   if (path === '/api/optimizer/analyze-failures' && method === 'GET') {
+    // Check if we have a valid cache
+    const currentRunCount = storage.simulationRuns.length;
+    const cache = storage.failureAnalysisCache;
+
+    if (cache && cache.runCount === currentRunCount && cache.patterns) {
+      console.log(`[Optimizer] Using cached analysis (${cache.patterns.length} patterns from ${cache.lastAnalyzed})`);
+      return { status: 200, data: cache.patterns };
+    }
+
+    // Cache miss - need to analyze
+    console.log(`[Optimizer] Cache miss, analyzing failures...`);
     const optimizer = new AgentOptimizer();
 
     // Get runs that failed OR scored below 100% (room for improvement)
@@ -470,10 +519,25 @@ export async function handleTrack2Request(
     console.log(`[Optimizer] Found ${improvableRuns.length} improvable runs out of ${storage.simulationRuns.length} total`);
 
     if (improvableRuns.length === 0) {
+      // Cache empty result too
+      storage.failureAnalysisCache = {
+        patterns: [],
+        runCount: currentRunCount,
+        lastAnalyzed: new Date().toISOString(),
+      };
       return { status: 200, data: [] };
     }
 
     const patterns = await optimizer.analyzeFailures(improvableRuns);
+
+    // Cache the results
+    storage.failureAnalysisCache = {
+      patterns,
+      runCount: currentRunCount,
+      lastAnalyzed: new Date().toISOString(),
+    };
+    console.log(`[Optimizer] Cached ${patterns.length} patterns`);
+
     return { status: 200, data: patterns };
   }
 
@@ -588,6 +652,7 @@ export async function handleTrack2Request(
     // Create versions for each optimized agent
     const newVersions = [];
     const nextVersion = storage.instructionVersions.length + 1;
+    const currentPassRate = calculatePassRate(storage.simulationRuns);
 
     for (let i = 0; i < multiAgentResult.results.length; i++) {
       const agentResult = multiAgentResult.results[i];
@@ -600,7 +665,7 @@ export async function handleTrack2Request(
         agentName: agentResult.agentName,
         instruction: agentResult.optimization.optimizedInstruction,
         failurePatternsAddressed: agentResult.patternsFixed,
-        passRateBefore: null,
+        passRateBefore: currentPassRate,
         passRateAfter: null,
         isActive: false,
         createdAt: new Date().toISOString(),

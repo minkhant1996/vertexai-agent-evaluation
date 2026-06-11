@@ -60,9 +60,10 @@ evals/traces/
 # ===========================================
 # Vendored reference (kept locally, not committed)
 # ===========================================
-# Full Google ADK source (~13MB, own nested .git). We depend on @google/adk via
-# npm; this folder is reference-only and not part of the build. See NOTICE.
+# Full Google ADK source. We depend on @google/adk via npm;
+# these folders are reference-only and not part of the build.
 adk-js/
+adk-python/
 
 # ===========================================
 # Prisma

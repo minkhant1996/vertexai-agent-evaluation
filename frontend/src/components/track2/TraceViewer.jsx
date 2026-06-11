@@ -5,9 +5,9 @@ import { Badge } from '../ui/badge'
 import { Input } from '../ui/input'
 import { StatCard } from '../ui/stat-card'
 import { cn } from '../../lib/utils'
+import { getAuthHeaders } from '../../lib/api'
 
-// Use relative URL when not in development (same-origin)
-const BACKEND_URL = import.meta.env.VITE_API_URL || ''
+import { API_URL as BACKEND_URL } from '../../config'
 
 export function TraceViewer({ sessionId }) {
   const [traces, setTraces] = useState([])
@@ -31,11 +31,11 @@ export function TraceViewer({ sessionId }) {
       const url = `${BACKEND_URL}/api/observability/traces/all?_t=${Date.now()}`
       console.log('[TraceViewer] URL:', url)
       const res = await fetch(url, {
-        credentials: 'include',
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          'Pragma': 'no-cache',
+          ...getAuthHeaders()
         }
       })
       console.log('[TraceViewer] Response status:', res.status)
@@ -75,7 +75,8 @@ export function TraceViewer({ sessionId }) {
     try {
       console.log('[TraceViewer] Fetching analytics...')
       const res = await fetch(`${BACKEND_URL}/api/observability/analytics`, {
-        credentials: 'same-origin'
+        credentials: 'same-origin',
+        headers: getAuthHeaders()
       })
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`)
